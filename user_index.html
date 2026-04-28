@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendify – Attendance Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">Attendify</div>
+    <div class="sidebar-section">Menu</div>
+
+    <div class="sidebar-item active" onclick="setPage('dashboard', this)">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Dashboard
+    </div>
+
+    <div class="sidebar-item" onclick="setPage('records', this)">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M9 12h6M9 16h6M9 8h3M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+      </svg>
+      My Records
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="avatar-small">JD</div>
+      <div class="user-info">
+        <div class="user-name">John Doe</div>
+        <div class="user-role">Employee</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <h1>Attendance Dashboard</h1>
+      <div class="dark-toggle" onclick="toggleDark()">
+        <div class="toggle-dot"></div>
+        Dark Mode
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Top Row: Welcome + Summary -->
+      <div class="top-row">
+
+        <!-- Welcome / Clock Card -->
+        <div class="card welcome-card">
+          <h2>Welcome, John Doe</h2>
+          <div class="clock" id="clock">00:00:00</div>
+          <div class="date-label" id="dateLabel">—</div>
+          <button class="btn-timein" id="timeInBtn" onclick="handleTimeIn()">Time In</button>
+          <div class="check-status" id="checkStatus">You haven't checked in yet</div>
+        </div>
+
+        <!-- Today's Summary Card -->
+        <div class="card summary-card">
+          <h3>Today's Summary</h3>
+          <div class="summary-row">
+            <span class="summary-label">Status</span>
+            <span id="statusBadge" class="badge-present">Present</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Time In</span>
+            <span class="summary-value" id="summaryTimeIn">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Time Out</span>
+            <span class="summary-value" id="summaryTimeOut">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Hours</span>
+            <span class="summary-value" id="summaryHours">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Month</span>
+            <span class="summary-value" id="summaryMonth">0/22</span>
+          </div>
+        </div>
+
+      </div><!-- /top-row -->
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="card stat-card">
+          <div>
+            <div class="stat-number green" id="statPresent">20</div>
+            <div class="stat-label">Days of Present</div>
+          </div>
+          <div class="stat-dot green" style="margin-left:auto"></div>
+        </div>
+        <div class="card stat-card">
+          <div>
+            <div class="stat-number red" id="statAbsent">10</div>
+            <div class="stat-label">Days of Absent</div>
+          </div>
+          <div class="stat-dot red" style="margin-left:auto"></div>
+        </div>
+        <div class="card stat-card">
+          <div>
+            <div class="stat-number amber" id="statLate">3</div>
+            <div class="stat-label">Days of Late</div>
+          </div>
+          <div class="stat-dot amber" style="margin-left:auto"></div>
+        </div>
+      </div><!-- /stats-row -->
+
+      <!-- Recent Attendance Table -->
+      <div class="card table-card">
+        <h3>Recent Attendance</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Hours</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceTable">
+            <!-- Populated by app.js -->
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

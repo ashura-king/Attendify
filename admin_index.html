@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendify – Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="admin_style.css"/>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">Attendify</div>
+
+    <div class="sidebar-item active" onclick="setPage('attendance', this)">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Attendance
+    </div>
+
+    <div class="sidebar-item" onclick="setPage('employee', this)">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/>
+      </svg>
+      Employee
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="avatar-small" style="background: linear-gradient(135deg,#a78bfa,#7c3aed);">AD</div>
+      <div class="user-info">
+        <div class="user-name">Admin</div>
+        <div class="user-role">HR Admin</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <h1>Attendance Dashboard</h1>
+      <div class="dark-toggle" onclick="toggleDark()">
+        <div class="toggle-dot"></div>
+        Dark Mode
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Stat Cards -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-card-label">Total of Employee</div>
+          <div class="stat-card-value" id="totalEmployee">12</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Total of Present</div>
+          <div class="stat-card-value" id="totalPresent">10</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Total of Late</div>
+          <div class="stat-card-value" id="totalLate">2</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Total of Absent</div>
+          <div class="stat-card-value" id="totalAbsent">0</div>
+        </div>
+      </div>
+
+      <!-- Attendance Table Card -->
+      <div class="card table-card">
+
+        <!-- Table Header Controls -->
+        <div class="table-controls">
+          <h3>Attendance</h3>
+          <div class="controls-right">
+            <div class="search-wrap">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input type="text" id="searchInput" placeholder="search..." oninput="filterTable()"/>
+            </div>
+            <div class="dept-filter">
+              <select id="deptFilter" onchange="filterTable()">
+                <option value="">All Department</option>
+                <option value="IT">IT</option>
+                <option value="Accounting">Accounting</option>
+                <option value="HR">HR</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Finance">Finance</option>
+              </select>
+            </div>
+            <button class="btn-add" onclick="openModal()">+ Add Record</button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px"></th>
+              <th>Name</th>
+              <th>Department</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceBody">
+            <!-- Populated by admin-app.js -->
+          </tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState" style="display:none;">
+          <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <p>No records found</p>
+        </div>
+
+      </div><!-- /table-card -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <!-- ── Add / Edit Modal ───────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Record</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editIndex" value="-1"/>
+
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="fieldName" placeholder="e.g. John Doe"/>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select id="fieldDept">
+            <option value="IT">IT</option>
+            <option value="Accounting">Accounting</option>
+            <option value="HR">HR</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Finance">Finance</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Time In</label>
+            <input type="time" id="fieldTimeIn"/>
+          </div>
+          <div class="form-group">
+            <label>Time Out</label>
+            <input type="time" id="fieldTimeOut"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="fieldStatus">
+            <option value="present">Present</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+          </select>
+        </div>
+        <div class="modal-error" id="modalError"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-save" onclick="saveRecord()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div class="modal-overlay" id="confirmOverlay" onclick="closeConfirmOutside(event)">
+    <div class="modal confirm-modal" id="confirmModal">
+      <div class="modal-header">
+        <h2>Remove Record</h2>
+        <button class="modal-close" onclick="closeConfirm()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:14px; color:var(--subtext);">Are you sure you want to remove <strong id="confirmName"></strong>?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+        <button class="btn-delete" onclick="confirmRemove()">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="admin_app.js"></script>
+</body>
+</html>

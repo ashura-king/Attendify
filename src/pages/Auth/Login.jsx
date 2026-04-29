@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import './Login.css'
-
+import { Link} from 'react-router-dom';
+import './Login.css';
+import { FontAwesomeIcon }  from '@fortawesome/react-fontawesome';
+import {faEye, faEyeSlash} from '@fortawesome/free-regular-svg-icons';
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -56,7 +58,9 @@ function Login() {
                   className="toggle-password"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? '🙈' : '👁️'}
+                  {showPassword ? 
+                  <FontAwesomeIcon icon={faEyeSlash} /> :
+                  <FontAwesomeIcon icon={faEye} />}
                 </button>
               </div>
             </div>

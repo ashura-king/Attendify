@@ -1,7 +1,8 @@
+import Login  from "./pages/Auth/Login";
 function App(){
   return(
     <div>
-      <h1>Attendance Management System</h1>
+      <Login/>
     </div>
   )
 }

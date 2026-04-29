@@ -42,6 +42,7 @@ body {
   letter-spacing: 2px;
   background: linear-gradient(135deg, #ffffff, #2ecc71);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -163,6 +164,19 @@ button[type="submit"] {
 button[type="submit"]:hover {
   opacity: 0.9;
   box-shadow: 0 4px 20px rgba(46, 204, 113, 0.4);
+}
+
+.create_account {
+  margin-top: 16px;
+  font-size: 14px;
+  color:#ffffff;
+  
+}
+.create_account a{
+  color:#ffffff;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 /* RESPONSIVE */

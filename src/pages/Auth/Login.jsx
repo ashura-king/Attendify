@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link} from 'react-router-dom';
-import './Login.css';
-import { FontAwesomeIcon }  from '@fortawesome/react-fontawesome';
-import {faEye, faEyeSlash} from '@fortawesome/free-regular-svg-icons';
+import { useNavigate } from 'react-router-dom'
+import './Login.css'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faEye, faEyeSlash } from '@fortawesome/free-regular-svg-icons'
+
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate()
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -16,7 +18,6 @@ function Login() {
 
   return (
     <div className="login-wrapper">
-
       <div className="login-left">
         <div className="brand">
           <div className="brandIcon">
@@ -28,6 +29,24 @@ function Login() {
 
       <div className="login-right">
         <div className="login-card">
+
+          {/* Tab Toggle */}
+          <div className="auth-tabs">
+            <div className="tab-slider" />
+            <button
+              className="tab-btn active"
+              onClick={() => navigate('/login')}
+            >
+              Sign In
+            </button>
+           <button
+  className="tab-btn"
+  onClick={() => navigate('/register')}
+>
+  Register
+</button>
+          </div>
+
           <h2>Welcome Back</h2>
           <p className="login-subtitle">Sign in to your account</p>
 
@@ -58,22 +77,17 @@ function Login() {
                   className="toggle-password"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? 
-                  <FontAwesomeIcon icon={faEyeSlash} /> :
-                  <FontAwesomeIcon icon={faEye} />}
+                  {showPassword
+                    ? <FontAwesomeIcon icon={faEyeSlash} />
+                    : <FontAwesomeIcon icon={faEye} />}
                 </button>
               </div>
             </div>
 
             <button type="submit">Sign In</button>
-            
           </form>
-          <p className="create_account">Dont have an account? <a href ="/register">Create one</a>
-           </p>
-          
         </div>
       </div>
-
     </div>
   )
 }

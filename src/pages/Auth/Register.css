@@ -9,13 +9,13 @@ body {
 }
 
 /* WRAPPER */
-.login-wrapper {
+.register-wrapper {
   display: flex;
   height: 100vh;
 }
 
 /* LEFT SIDE */
-.login-left {
+.register-left {
   flex: 1;
   background: linear-gradient(135deg, #000000, #1a1a1a, #145a32);
   display: flex;
@@ -54,7 +54,7 @@ body {
 }
 
 /* RIGHT SIDE */
-.login-right {
+.register-right {
   flex: 1;
   display: flex;
   align-items: center;
@@ -64,7 +64,7 @@ body {
 }
 
 /* CARD */
-.login-card {
+.register-card {
   background: #1a1a1a;
   border: 1px solid #2ecc71;
   padding: 48px 40px;
@@ -74,21 +74,21 @@ body {
   box-shadow: 0 0 40px rgba(46, 204, 113, 0.15);
 }
 
-.login-card h2 {
+.register-card h2 {
   font-size: 28px;
   font-weight: 700;
   color: #2ecc71;
   margin-bottom: 6px;
 }
 
-.login-subtitle {
+.register-subtitle {
   color: #888;
   font-size: 14px;
   margin-bottom: 32px;
 }
 
 /* FORM */
-.login-form {
+.register-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -218,13 +218,35 @@ button[type="submit"]:hover {
   background: #1f1f1f;
   color: #2ecc71;
 }
+.create_account {
+  margin-top: 16px;
+  padding: 14px;
+  width: 100%;
+
+  background: transparent;
+  border: 1px solid #2ecc71;
+  border-radius: 8px;
+
+  color: #2ecc71;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.create_account:hover {
+  background: #2ecc71;
+  color: white;
+}
 /* RESPONSIVE */
 @media (max-width: 768px) {
-  .login-wrapper {
+  .register-wrapper {
     flex-direction: column;
   }
 
-  .login-left {
+  .register-left {
     flex: none;
     padding: 40px 20px;
   }
@@ -233,12 +255,12 @@ button[type="submit"]:hover {
     font-size: 32px;
   }
 
-  .login-right {
+  .register-right {
     flex: 1;
     padding: 20px;
   }
 
-  .login-card {
+  .register-card {
     padding: 32px 24px;
   }
 }

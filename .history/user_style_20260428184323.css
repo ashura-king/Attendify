@@ -458,27 +458,3 @@ body.dark .status-pill.late    { background: rgba(245, 158, 11, 0.15); color: #f
   max-width: 280px;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
-
-/* ================================================================
-   TABLE HEADER ROW  (title + View All link)
-   ================================================================ */
-.table-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-.table-header-row h3 { font-size: 15px; font-weight: 700; }
-
-.btn-view-all {
-  font-size: 12.5px;
-  font-weight: 600;
-  font-family: 'DM Sans', sans-serif;
-  color: var(--subtext);
-  text-decoration: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 14px;
-  transition: border-color 0.2s, color 0.2s;
-}
-.btn-view-all:hover { border-color: var(--green); color: var(--green); }

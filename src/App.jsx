@@ -1,12 +1,12 @@
 import { BrowserRouter as Router, Route, Navigate, Routes } from "react-router-dom";
-import { useEffect } from "react"; // ⬅️ add this
-import { supabase } from "./lib/supabaseClient"; // ⬅️ add this
+import { useEffect } from "react";
+import { supabase } from "./lib/supabaseClient";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
 import Dashboard from "./pages/Dashboard/Dashboard";
-import AdminPanel from "./pages/Admin/AdminPanel"; // ⬅️ also fixed double slash //
+import AdminPanel from "./pages/Admin/AdminPanel"; 
 
 function App() {
   useEffect(() => {

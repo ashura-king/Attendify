@@ -3,23 +3,61 @@ import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faEyeSlash } from '@fortawesome/free-regular-svg-icons';
 import './Register.css';
+import { supabase } from "../../lib/supabaseClient";
 
 function Register() {
-  const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false)
-  const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (password !== confirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: username  
+      }
     }
-    console.log('Register submitted:', { username, email, password });
-  };
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  const user = data.user;
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .insert([
+      {
+        id: user.id,         
+        full_name: username,  
+        email: email,
+        role: "employee"    
+      }
+    ]);
+
+  if (profileError) {
+    alert(profileError.message);
+    return;
+  }
+
+  console.log("User + profile created ✅");
+  navigate("/login");
+};
 
   return (
     <div className="register-wrapper">
@@ -107,7 +145,7 @@ function Register() {
             </div>
 
     <button
-     type="button"
+     type="submit"
      className="create_account"
         onClick={() => navigate('/login')}
         >

@@ -3,17 +3,46 @@ import { useNavigate } from 'react-router-dom'
 import './Login.css'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEye, faEyeSlash } from '@fortawesome/free-regular-svg-icons'
+import { supabase } from '../../lib/supabaseClient'
 
 function Login() {
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState('')  
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Login submitted:', { username, password })
-    // TODO: connect to backend for authentication
+    setLoading(true)
+
+   
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('full_name', username)
+      .single()
+
+    if (profileError || !profile) {
+      alert('Username not found!')
+      setLoading(false)
+      return
+    }
+
+   
+    const { error } = await supabase.auth.signInWithPassword({
+      email: profile.email,
+      password,
+    })
+
+    if (error) {
+      alert(error.message)
+      setLoading(false)
+      return
+    }
+
+    navigate('/dashboard')
+    setLoading(false)
   }
 
   return (
@@ -26,30 +55,19 @@ function Login() {
           </div>
         </div>
       </div>
-
       <div className="login-right">
         <div className="login-card">
-
-          {/* Tab Toggle */}
           <div className="auth-tabs">
             <div className="tab-slider" />
-            <button
-              className="tab-btn active"
-              onClick={() => navigate('/login')}
-            >
+            <button className="tab-btn active" onClick={() => navigate('/login')}>
               Sign In
             </button>
-           <button
-  className="tab-btn"
-  onClick={() => navigate('/register')}
->
-  Register
-</button>
+            <button className="tab-btn" onClick={() => navigate('/register')}>
+              Register
+            </button>
           </div>
-
           <h2>Welcome Back</h2>
           <p className="login-subtitle">Sign in to your account</p>
-
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
               <label htmlFor="username">Username</label>
@@ -58,10 +76,10 @@ function Login() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your full name"
                 required
               />
             </div>
-
             <div className="form-group">
               <label htmlFor="password">Password</label>
               <div className="password-wrapper">
@@ -83,8 +101,9 @@ function Login() {
                 </button>
               </div>
             </div>
-
-            <button type="submit">Sign In</button>
+            <button type="submit" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
           </form>
         </div>
       </div>

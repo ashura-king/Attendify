@@ -9,4 +9,4 @@ const AdminPanel = () => {
   )
 }
 
-export default AdminPanel  // ⬅️ this too!
+export default AdminPanel  

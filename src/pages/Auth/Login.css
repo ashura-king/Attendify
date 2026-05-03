@@ -190,7 +190,7 @@ button[type="submit"]:hover {
   border-radius: 10px;
   padding: 4px;
   margin-bottom: 28px;
-  gap: 6px; /* adds space between buttons */
+  gap: 6px; 
 }
 
 .tab-btn {

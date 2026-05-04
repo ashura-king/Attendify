@@ -1,10 +1,3 @@
-/* ================================================================
-   admin_employee_app.js — Attendify Employee Management Page
-   ================================================================ */
-
-/* ================================================================
-   DATA
-   ================================================================ */
 let employees = [
   { firstName:'John',    lastName:'Doe',      email:'john.doe@company.com',      dept:'IT',         position:'Developer',       joined:'2023-03-15', status:'Active'   },
   { firstName:'Maria',   lastName:'Sina',     email:'maria.sina@company.com',    dept:'Accounting', position:'Accountant',      joined:'2022-07-01', status:'Active'   },

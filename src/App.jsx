@@ -1,6 +1,4 @@
 import { BrowserRouter as Router, Route, Navigate, Routes } from "react-router-dom";
-import { useEffect } from "react";
-import { supabase } from "./lib/supabaseClient";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Auth/Login";
@@ -9,18 +7,8 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import AdminPanel from "./pages/Admin/AdminPanel"; 
 
 function App() {
-  useEffect(() => {
-    const checkConnection = async () => {
-      const { data, error } = await supabase.from('profiles').select('count')
-      if (error) {
-        console.log('❌ Supabase NOT connected:', error.message)
-      } else {
-        console.log('✅ Supabase Connected!')
-      }
-    }
-    checkConnection()
-  }, [])
-
+ 
+    
   return (
     <AuthProvider>
       <Router>

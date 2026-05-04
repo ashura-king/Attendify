@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState,useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import './Dashboard.css';
 import { supabase } from "../../lib/supabaseClient";
@@ -16,58 +16,134 @@ const Dashboard = () => {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [profile, setProfile] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false); 
-  const [showProfile, setShowProfile] = useState(false);
- const [editName, setEditName] = useState("");
- const [editEmail, setEditEmail] = useState("");
- const [editPassword, setEditPassword] = useState("");
- const [confirmNewPassword, setConfirmNewPassword] = useState("");
- const [avatar, setAvatar] = useState(null);
- const [avatarPreview, setAvatarPreview] = useState(null);
- const [profileLoading, setProfileLoading] = useState(false);
- const [profileMsg, setProfileMsg] = useState({ type: "", text: "" });
+  const [menuOpen, setMenuOpen] = useState(false);
 
+  // Profile modal states
+  const [showProfile, setShowProfile] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [avatar, setAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState({ type: "", text: "" });
+
+  // Monthly records states
   const [monthlyRecords, setMonthlyRecords] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-  
 
+  // ===== FETCH FUNCTIONS =====
 
+  const fetchProfile = useCallback(async () => {
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name, role, email, avatar_url")
+    .eq("id", user.id)
+    .single();
+  if (data) {
+    setProfile(data);
+    setEditName(data?.full_name || "");
+    setEditEmail(data?.email || user?.email || "");
+    setAvatarPreview(data?.avatar_url || null);
+  }
+}, [user]);
+
+const fetchTodayRecord = useCallback(async () => {
+  const today = new Date().toISOString().split("T")[0];
+  const { data } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("date", today)
+    .single();
+  setTodayRecord(data || null);
+}, [user]);
+
+const fetchHistory = useCallback(async () => {
+  const { data } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false })
+    .limit(10);
+  if (data) {
+    setHistory(data);
+    setSummary({
+      present: data.filter((r) => r.status === "present").length,
+      late: data.filter((r) => r.status === "late").length,
+      absent: data.filter((r) => r.status === "absent").length,
+    });
+  }
+}, [user]);
+
+const fetchMonthlyRecords = useCallback(async () => {
+  const [year, month] = selectedMonth.split("-");
+  const from = `${year}-${month}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const to = `${year}-${month}-${lastDay}`;
+  const { data } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("user_id", user.id)
+    .gte("date", from)
+    .lte("date", to)
+    .order("date", { ascending: false });
+  setMonthlyRecords(data || []);
+}, [user, selectedMonth]);
+
+  // ===== USE EFFECTS =====
+
+  // Live clock
   useEffect(() => {
     const timer = setInterval(() => setcurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch data on login
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchTodayRecord();
-      fetchHistory();
-    }
-  }, [user]);
+  if (!user) return;
 
+  const loadData = async () => {
+    await fetchProfile();
+    await fetchTodayRecord();
+    await fetchHistory();
+  };
+
+  loadData();
+}, [user,fetchProfile,fetchTodayRecord,fetchHistory]);
+  // Fetch monthly records when nav changes
   useEffect(() => {
-    if (user && activeNav === "records") {
-      fetchMonthlyRecords();
-    }
-  }, [user, activeNav, selectedMonth]);
+     if(!user || activeNav !== "records") return;
+     const loadRecords = async () =>{
+      await fetchMonthlyRecords();
+     };
 
+    loadRecords();
+  }, [user, activeNav, selectedMonth,fetchMonthlyRecords]);
+
+  // Dark mode
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
   }, [darkMode]);
-useEffect(() => {
-  const handleScroll = () => {
-    if (menuOpen) setMenuOpen(false);
-  };
-  window.addEventListener("scroll", handleScroll, true);
-  return () => window.removeEventListener("scroll", handleScroll, true);
-}, [menuOpen]);
-  
+
+  // Close menu on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (menuOpen) setMenuOpen(false);
+    };
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [menuOpen]);
+
+  // Close menu on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (menuOpen && 
+      if (
+        menuOpen &&
         !e.target.closest(".mobile-dropdown") &&
         !e.target.closest(".hamburger")
       ) {
@@ -78,140 +154,7 @@ useEffect(() => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  const fetchProfile = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name, role, email, avatar_url")
-      .eq("id", user.id)
-      .single();
-    setProfile(data);
-    setEditName(data?.full_name || "");
-    setEditEmail(data?.email || user?.email || "");
-    setAvatarPreview(data?.avatar_url || null);
-  };
-
-  const handleAvatarChange = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  setAvatar(file);
-  setAvatarPreview(URL.createObjectURL(file));
-};
-
-const handleSaveProfile = async () => {
-  setProfileLoading(true);
-  setProfileMsg({ type: "", text: "" });
-
-  try {
-    let avatarUrl = profile?.avatar_url || null;
-    if (avatar) {
-      const fileExt = avatar.name.split(".").pop();
-      const fileName = `${user.id}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, avatar, { upsert: true });
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from("avatars")
-          .getPublicUrl(fileName);
-        avatarUrl = urlData.publicUrl;
-      }
-    }
-
-    
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({ full_name: editName, avatar_url: avatarUrl })
-      .eq("id", user.id);
-
-    if (profileError) throw profileError;
-
-  
-    if (editEmail && editEmail !== user.email) {
-      const { error: emailError } = await supabase.auth.updateUser({
-        email: editEmail,
-      });
-      if (emailError) throw emailError;
-    }
-
-    
-    if (editPassword && editPassword.trim() !== "") {
-      if (editPassword !== confirmNewPassword) {
-        setProfileMsg({ type: "error", text: "Passwords do not match!" });
-        setProfileLoading(false);
-        return;
-      }
-      if (editPassword.length < 6) {
-        setProfileMsg({ type: "error", text: "Password must be at least 6 characters!" });
-        setProfileLoading(false);
-        return;
-      }
-      const { error: passError } = await supabase.auth.updateUser({
-        password: editPassword,
-      });
-      if (passError) throw passError;
-    }
-
-    await fetchProfile();
-    setEditPassword("");
-    setConfirmNewPassword("");
-    setAvatar(null);
-    setProfileMsg({ type: "success", text: "Profile updated successfully!" });
-
-  } catch (err) {
-    setProfileMsg({ type: "error", text: err.message });
-  }
-
-  setProfileLoading(false);
-};
-
-    
-
-  const fetchTodayRecord = async () => {
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date", today)
-      .single();
-    setTodayRecord(data || null);
-  };
-
-  const fetchHistory = async () => {
-    const { data } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("date", { ascending: false })
-      .limit(10);
-
-    if (data) {
-      setHistory(data);
-      setSummary({
-        present: data.filter((r) => r.status === "present").length,
-        late: data.filter((r) => r.status === "late").length,
-        absent: data.filter((r) => r.status === "absent").length,
-      });
-    }
-  };
-
-  const fetchMonthlyRecords = async () => {
-    const [year, month] = selectedMonth.split("-");
-    const from = `${year}-${month}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const to = `${year}-${month}-${lastDay}`;
-
-    const { data } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", user.id)
-      .gte("date", from)
-      .lte("date", to)
-      .order("date", { ascending: false });
-
-    setMonthlyRecords(data || []);
-  };
+  // ===== ATTENDANCE HANDLERS =====
 
   const handleClockIn = async () => {
     setLoading(true);
@@ -227,7 +170,10 @@ const handleSaveProfile = async () => {
       status,
     });
 
-    if (!error) { await fetchTodayRecord(); await fetchHistory(); }
+    if (!error) {
+      await fetchTodayRecord();
+      await fetchHistory();
+    }
     setLoading(false);
   };
 
@@ -240,7 +186,10 @@ const handleSaveProfile = async () => {
       .update({ clock_out: timeStr })
       .eq("id", todayRecord.id);
 
-    if (!error) { await fetchTodayRecord(); await fetchHistory(); }
+    if (!error) {
+      await fetchTodayRecord();
+      await fetchHistory();
+    }
     setLoading(false);
   };
 
@@ -248,6 +197,98 @@ const handleSaveProfile = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
+
+  // ===== PROFILE HANDLERS =====
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatar(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleSaveProfile = async () => {
+    setProfileLoading(true);
+    setProfileMsg({ type: "", text: "" });
+
+    try {
+      // Upload avatar if changed
+      let avatarUrl = profile?.avatar_url || null;
+      if (avatar) {
+        const fileExt = avatar.name.split(".").pop();
+        const fileName = `${user.id}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("Avatar")
+          .upload(fileName, avatar, { upsert: true });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from("Avatar")
+            .getPublicUrl(fileName);
+          avatarUrl = urlData.publicUrl;
+        }
+      }
+
+      // Update profiles table
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editName,
+          avatar_url: avatarUrl,
+          email: editEmail,
+        })
+        .eq("id", user.id);
+
+      if (profileError) throw profileError;
+
+      // Update email in auth if changed
+      if (editEmail && editEmail !== user.email) {
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: editEmail,
+        });
+        if (emailError) throw emailError;
+      }
+
+      // Update password only if user typed something
+      if (editPassword && editPassword.trim() !== "") {
+        if (editPassword !== confirmNewPassword) {
+          setProfileMsg({ type: "error", text: "Passwords do not match!" });
+          setProfileLoading(false);
+          return;
+        }
+        if (editPassword.length < 6) {
+          setProfileMsg({ type: "error", text: "Password must be at least 6 characters!" });
+          setProfileLoading(false);
+          return;
+        }
+        const { error: passError } = await supabase.auth.updateUser({
+          password: editPassword,
+        });
+        if (passError) throw passError;
+      }
+
+   
+    setProfile((prev) => ({
+     ...prev,
+    full_name: editName,
+    email: editEmail,
+    avatar_url: avatarUrl,
+  }));
+  setAvatarPreview(avatarUrl);
+  setEditPassword("");
+  setConfirmNewPassword("");
+  setAvatar(null);
+  setProfileMsg({ type: "success", text: "Profile updated successfully!" });
+
+
+    } catch (err) {
+      setProfileMsg({ type: "error", text: err.message });
+    }
+
+    setProfileLoading(false);
+  };
+
+  // ===== HELPER FUNCTIONS =====
 
   const formatTime = (timeStr) => {
     if (!timeStr) return "--:--";
@@ -271,7 +312,11 @@ const handleSaveProfile = async () => {
 
   const getStatusBadge = (status) => {
     if (!status) return null;
-    return <span className={`badge-${status}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>;
+    return (
+      <span className={`badge-${status}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
   };
 
   const totalDays = summary.present + summary.late + summary.absent;
@@ -282,138 +327,146 @@ const handleSaveProfile = async () => {
     absent: monthlyRecords.filter((r) => r.status === "absent").length,
   };
 
+  // ===== RENDER =====
+
   return (
     <div className={`app-layout ${darkMode ? "dark" : ""}`}>
- 
-{showProfile && (
-  <div className="modal-overlay" onClick={() => setShowProfile(false)}>
-    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
 
-      <div className="modal-header">
-        <h2>Profile Settings</h2>
-        <button className="modal-close" onClick={() => setShowProfile(false)}>✕</button>
-      </div>
+      {/* PROFILE MODAL */}
+      {showProfile && (
+        <div className="modal-overlay" onClick={() => setShowProfile(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
 
-      
-      <div className="modal-avatar-section">
-        <div className="modal-avatar">
-          {avatarPreview
-            ? <img src={avatarPreview} alt="avatar" className="avatar-img-lg" />
-            : <span>{getInitials(profile?.full_name)}</span>
-          }
+            <div className="modal-header">
+              <h2>Profile Settings</h2>
+              <button className="modal-close" onClick={() => setShowProfile(false)}>✕</button>
+            </div>
+
+            {/* AVATAR */}
+            <div className="modal-avatar-section">
+              <div className="modal-avatar">
+                {avatarPreview
+                  ? <img src={avatarPreview} alt="avatar" className="avatar-img-lg" />
+                  : <span>{getInitials(profile?.full_name)}</span>
+                }
+              </div>
+              <label className="btn-change-avatar">
+                Change Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  style={{ display: "none" }}
+                />
+              </label>
+            </div>
+
+            {/* FORM */}
+            <div className="modal-form">
+              <div className="modal-field">
+                <label>Full Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div className="modal-field">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="Enter email"
+                />
+              </div>
+
+              <div className="modal-divider" />
+              <p className="modal-section-label">Change Password</p>
+
+              <div className="modal-field">
+                <label>New Password</label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Leave blank to keep current"
+                />
+              </div>
+
+              <div className="modal-field">
+                <label>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                />
+              </div>
+
+              {profileMsg.text && (
+                <p className={`modal-msg ${profileMsg.type}`}>
+                  {profileMsg.type === "success" ? "✓" : "✕"} {profileMsg.text}
+                </p>
+              )}
+
+              <button
+                className="btn-save-profile"
+                onClick={handleSaveProfile}
+                disabled={profileLoading}
+              >
+                {profileLoading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
         </div>
-        <label className="btn-change-avatar">
-          Change Photo
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleAvatarChange}
-            style={{ display: "none" }}
-          />
-        </label>
-      </div>
+      )}
 
-      {/* FORM */}
-      <div className="modal-form">
-
-        <div className="modal-field">
-          <label>Full Name</label>
-          <input
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            placeholder="Enter full name"
-          />
-        </div>
-
-        <div className="modal-field">
-          <label>Email</label>
-          <input
-            type="email"
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-            placeholder="Enter email"
-          />
-        </div>
-
-        <div className="modal-divider" />
-
-        <p className="modal-section-label">Change Password</p>
-
-        <div className="modal-field">
-          <label>New Password</label>
-          <input
-            type="password"
-            value={editPassword}
-            onChange={(e) => setEditPassword(e.target.value)}
-            placeholder="Leave blank to keep current"
-          />
-        </div>
-
-        <div className="modal-field">
-          <label>Confirm New Password</label>
-          <input
-            type="password"
-            value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
-            placeholder="Confirm new password"
-          />
-        </div>
-
-        
-        {profileMsg.text && (
-          <p className={`modal-msg ${profileMsg.type}`}>
-            {profileMsg.type === "success" ? "✓" : "✕"} {profileMsg.text}
-          </p>
-        )}
-
-        <button
-          className="btn-save-profile"
-          onClick={handleSaveProfile}
-          disabled={profileLoading}
-        >
-          {profileLoading ? "Saving..." : "Save Changes"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="sidebar-logo">Attendify</div>
         <p className="sidebar-menu-label">Menu</p>
         <nav className="sidebar-nav">
-          <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => setActiveNav("dashboard")}>
+          <div
+            className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`}
+            onClick={() => setActiveNav("dashboard")}
+          >
             Dashboard
           </div>
-          <div className={`nav-item ${activeNav === "records" ? "active" : ""}`} onClick={() => setActiveNav("records")}>
+          <div
+            className={`nav-item ${activeNav === "records" ? "active" : ""}`}
+            onClick={() => setActiveNav("records")}
+          >
             My Records
           </div>
         </nav>
         <div className="sidebar-user" onClick={() => setShowProfile(true)}>
-  <div className="user-avatar">
-    {avatarPreview
-      ? <img src={avatarPreview} alt="avatar" className="avatar-img" />
-      : getInitials(profile?.full_name)
-    }
-  </div>
-  <div className="user-info">
-    <p>{profile?.full_name || "User"}</p>
-    <span>⚙ Profile Settings</span>
-  </div>
-</div>
+          <div className="user-avatar">
+            {avatarPreview
+              ? <img src={avatarPreview} alt="avatar" className="avatar-img" />
+              : getInitials(profile?.full_name)
+            }
+          </div>
+          <div className="user-info">
+            <p>{profile?.full_name || "User"}</p>
+            <span>⚙ Profile Settings</span>
+          </div>
+        </div>
       </aside>
 
       {/* MAIN */}
       <div className="main-area">
+
+        {/* TOPBAR */}
         <div className="topbar">
           <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)}>
             <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
             <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
             <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
           </button>
-
           <h1>{activeNav === "dashboard" ? "Attendance Dashboard" : "My Records"}</h1>
-
           <div className="topbar-actions">
             <button className="dark-mode-toggle" onClick={() => setDarkMode(!darkMode)}>
               <div className={`toggle-track ${darkMode ? "on" : ""}`}>
@@ -425,10 +478,15 @@ const handleSaveProfile = async () => {
           </div>
         </div>
 
-        {/* MOBILE DROPDOWN MENU */}
+        {/* MOBILE DROPDOWN */}
         <div className={`mobile-dropdown ${menuOpen ? "open" : ""}`}>
           <div className="mobile-dropdown-user">
-            <div className="user-avatar">{getInitials(profile?.full_name)}</div>
+            <div className="user-avatar">
+              {avatarPreview
+                ? <img src={avatarPreview} alt="avatar" className="avatar-img" />
+                : getInitials(profile?.full_name)
+              }
+            </div>
             <div>
               <p>{profile?.full_name || "User"}</p>
               <span>{profile?.role || "Employee"}</span>
@@ -447,12 +505,19 @@ const handleSaveProfile = async () => {
           >
             My Records
           </div>
+          <div
+            className="nav-item"
+            onClick={() => { setShowProfile(true); setMenuOpen(false); }}
+          >
+            ⚙ Profile Settings
+          </div>
           <div className="mobile-dropdown-divider" />
           <div className="nav-item nav-logout" onClick={() => { handleLogout(); setMenuOpen(false); }}>
             Logout
           </div>
         </div>
 
+        {/* CONTENT */}
         <div className="dashboard-content">
 
           {/* DASHBOARD VIEW */}
@@ -462,11 +527,21 @@ const handleSaveProfile = async () => {
                 <div className="welcome-card">
                   <h2>Welcome {profile?.full_name || "User"}</h2>
                   <div className="live-clock">
-                    {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
+                    {currentTime.toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: false,
+                    })}
                   </div>
                   <div className="live-date">
-                    {currentTime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    {currentTime.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
                   </div>
+
                   {!todayRecord ? (
                     <>
                       <button className="btn-timein" onClick={handleClockIn} disabled={loading}>
@@ -490,7 +565,10 @@ const handleSaveProfile = async () => {
                   <h3>Today's Summary</h3>
                   <div className="summary-row">
                     <span className="summary-label">Status</span>
-                    {todayRecord ? getStatusBadge(todayRecord.status) : <span className="no-status">Not clocked in</span>}
+                    {todayRecord
+                      ? getStatusBadge(todayRecord.status)
+                      : <span className="no-status">Not clocked in</span>
+                    }
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Time In</span>

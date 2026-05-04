@@ -22,7 +22,7 @@ let filteredEmployees = [...employees];
 let pendingDeleteIndex = -1;
 let toastTimer = null;
 
-/* =========================================================git add admin_app.js=======
+/* ================================================================
    UTILITY
    ================================================================ */
 function getInitials(first, last) {

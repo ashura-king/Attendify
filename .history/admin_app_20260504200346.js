@@ -1,3 +1,7 @@
+/**
+ * Initial attendance records dataset.
+ * Each record represents one employee's attendance entry for the day.
+ */
 let records = [
   { name: 'John Doe',       dept: 'IT',         timeIn: '9:00',  timeOut: '11:04', status: 'late'    },
   { name: 'Maria Sina',     dept: 'Accounting',  timeIn: '8:40',  timeOut: '12:01', status: 'present' },

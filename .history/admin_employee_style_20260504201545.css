@@ -1,0 +1,88 @@
+.emp-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.emp-strip-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: background 0.3s, border-color 0.3s, transform 0.15s;
+}
+.emp-strip-card:hover { transform: translateY(-2px); }
+
+.emp-strip-icon {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.emp-strip-value {
+  font-size: 26px;
+  font-weight: 700;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--text);
+}
+.emp-strip-label {
+  font-size: 11.5px;
+  color: var(--subtext);
+  font-weight: 500;
+  margin-top: 3px;
+}
+
+/* ================================================================
+   EMPLOYEE TABLE CARD
+   ================================================================ */
+.emp-card { padding: 24px 26px; }
+
+/* Status badges */
+.emp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+}
+.emp-status.active   { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.emp-status.inactive { background: rgba(239,68,68,0.12);  color: #dc2626; }
+
+body.dark .emp-status.active   { background: rgba(34,197,94,0.18);  color: #4ade80; }
+body.dark .emp-status.inactive { background: rgba(239,68,68,0.18);  color: #f87171; }
+
+/* Department tag */
+.dept-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(139,92,246,0.1);
+  color: var(--violet);
+}
+body.dark .dept-tag { background: rgba(139,92,246,0.18); }
+
+/* Table overrides */
+tbody td {
+  padding: 13px 14px;
+  font-size: 13px;
+  color: var(--text);
+  vertical-align: middle;
+}
+tbody td.td-mono {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--subtext);
+}

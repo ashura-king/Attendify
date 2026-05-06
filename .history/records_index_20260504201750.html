@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendify – My Records</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="user_style.css"/>
+  <link rel="stylesheet" href="records_style.css"/>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">Attendify</div>
+    <div class="sidebar-section">Menu</div>
+
+    <!-- LINK: Dashboard -->
+    <a class="sidebar-item" href="user_index.html">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Dashboard
+    </a>
+
+    <!-- ACTIVE: My Records -->
+    <a class="sidebar-item active" href="records_index.html">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M9 12h6M9 16h6M9 8h3M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+      </svg>
+      My Records
+    </a>
+
+    <div class="sidebar-bottom">
+      <div class="avatar-small">JD</div>
+      <div class="user-info">
+        <div class="user-name">John Doe</div>
+        <div class="user-role">Employee</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <h1>My Records</h1>
+      <div class="dark-toggle" onclick="toggleDark()">
+        <div class="toggle-dot"></div>
+        Dark Mode
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Summary Strip -->
+      <div class="summary-strip">
+        <div class="strip-card strip-present">
+          <div class="strip-icon">✅</div>
+          <div>
+            <div class="strip-value" id="stripPresent">0</div>
+            <div class="strip-label">Present</div>
+          </div>
+        </div>
+        <div class="strip-card strip-absent">
+          <div class="strip-icon">❌</div>
+          <div>
+            <div class="strip-value" id="stripAbsent">0</div>
+            <div class="strip-label">Absent</div>
+          </div>
+        </div>
+        <div class="strip-card strip-late">
+          <div class="strip-icon">⏰</div>
+          <div>
+            <div class="strip-value" id="stripLate">0</div>
+            <div class="strip-label">Late</div>
+          </div>
+        </div>
+        <div class="strip-card strip-hours">
+          <div class="strip-icon">🕐</div>
+          <div>
+            <div class="strip-value" id="stripHours">0h</div>
+            <div class="strip-label">Total Hours</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Records Table Card -->
+      <div class="card records-card">
+
+        <!-- Controls -->
+        <div class="records-controls">
+          <h3>Attendance Records</h3>
+          <div class="controls-right">
+            <div class="search-wrap">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input type="text" id="searchInput" placeholder="Search date or status…" oninput="filterRecords()"/>
+            </div>
+            <div class="filter-wrap">
+              <select id="statusFilter" onchange="filterRecords()">
+                <option value="">All Status</option>
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="absent">Absent</option>
+              </select>
+            </div>
+            <div class="filter-wrap">
+              <select id="monthFilter" onchange="filterRecords()">
+                <option value="">All Months</option>
+                <option value="January">January</option>
+                <option value="February">February</option>
+                <option value="March">March</option>
+                <option value="April">April</option>
+                <option value="May">May</option>
+                <option value="June">June</option>
+                <option value="July">July</option>
+                <option value="August">August</option>
+                <option value="September">September</option>
+                <option value="October">October</option>
+                <option value="November">November</option>
+                <option value="December">December</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('date')"    class="sortable">Date     <span class="sort-icon" id="sort-date"></span></th>
+              <th onclick="sortBy('timeIn')"  class="sortable">Time In  <span class="sort-icon" id="sort-timeIn"></span></th>
+              <th onclick="sortBy('timeOut')" class="sortable">Time Out <span class="sort-icon" id="sort-timeOut"></span></th>
+              <th onclick="sortBy('hours')"   class="sortable">Hours    <span class="sort-icon" id="sort-hours"></span></th>
+              <th onclick="sortBy('status')"  class="sortable">Status   <span class="sort-icon" id="sort-status"></span></th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState" style="display:none;">
+          <svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M9 12h6M9 16h6M9 8h3M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+          </svg>
+          <p>No records match your filters</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+
+      </div><!-- /records-card -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <div class="toast" id="toast"></div>
+  <script src="records_app.js"></script>
+</body>
+</html>

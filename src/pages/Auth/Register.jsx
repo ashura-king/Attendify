@@ -41,7 +41,7 @@ function Register() {
 
   const { error: profileError } = await supabase
     .from("profiles")
-    .insert([
+    .upsert([
       {
         id: user.id,         
         full_name: username,  

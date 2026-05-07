@@ -13,25 +13,25 @@ const AdminPanel = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [adminProfile, setAdminProfile] = useState(null);
 
-  // Attendance states
+ 
   const [attendance, setAttendance] = useState([]);
   const [filterDate, setFilterDate] = useState("");
   const [filterName, setFilterName] = useState("");
 
-  // Employee states
+ 
   const [employees, setEmployees] = useState([]);
 
-  // Stats
+  
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
 
-  // Edit modal
+ 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
   const [editFields, setEditFields] = useState({
     clock_in: "", clock_out: "", status: "", date: ""
   });
 
-  // ===== FETCH FUNCTIONS =====
+
 
   const fetchAdminProfile = useCallback(async () => {
     const { data } = await supabase
@@ -61,7 +61,7 @@ const AdminPanel = () => {
       }
       setAttendance(filtered);
 
-      // Stats for today
+      
       const today = new Date().toISOString().split("T")[0];
       const todayData = data.filter((r) => r.date === today);
       const allEmployees = await supabase.from("profiles").select("id").eq("role", "employee");
@@ -116,7 +116,7 @@ const AdminPanel = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-s
+
   useEffect(() => {
     if (user) fetchAttendance();
   }, [filterDate, filterName, fetchAttendance]);

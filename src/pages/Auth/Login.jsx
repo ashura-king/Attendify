@@ -41,7 +41,11 @@ function Login() {
       return
     }
 
-    navigate('/dashboard')
+    if(profile.role === 'admin'){
+      navigate('/admin')
+    }else{
+      navigate('/dashboard')
+    }
     setLoading(false)
   }
 

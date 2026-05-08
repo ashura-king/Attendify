@@ -6,7 +6,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (loading) return <div>Loading...</div>
   if (!user) return <Navigate to="/login" />
-  if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to="/admin" />
+ 
+  if(role === 'admin' && window.location.pathname === '/dashboard'){
+    return <Navigate to="/admin"/>
+  }
+
+  if(role === 'employee' && window.location.pathname === '/admin'){
+    return <Navigate to="/dashboard"/>
+  }if(allowedRoles && !allowedRoles.includes(role)){
+    return <Navigate to ="/login"/>
+  }
 
   return children
 }

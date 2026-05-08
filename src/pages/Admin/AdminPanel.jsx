@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Admin.css";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
-
+import trashGif from "../../assets/icons/trash.gif";
 const AdminPanel = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -13,26 +14,29 @@ const AdminPanel = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [adminProfile, setAdminProfile] = useState(null);
 
- 
   const [attendance, setAttendance] = useState([]);
   const [filterDate, setFilterDate] = useState("");
   const [filterName, setFilterName] = useState("");
 
- 
   const [employees, setEmployees] = useState([]);
-
-  
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
 
- 
+  
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
   const [editFields, setEditFields] = useState({
-    clock_in: "", clock_out: "", status: "", date: ""
+    clock_in: "", clock_out: "", status: "", date: "",
   });
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
 
 
+  const [showEmpEdit, setShowEmpEdit] = useState(false);
+  const [editEmp, setEditEmp] = useState(null);
+  const [editEmpDept, setEditEmpDept] = useState("");
+
+  
   const fetchAdminProfile = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
@@ -45,33 +49,53 @@ const AdminPanel = () => {
   const fetchAttendance = useCallback(async () => {
     let query = supabase
       .from("attendance")
-      .select("*, profiles(full_name, department, avatar_url)")
+      .select("*")
       .order("date", { ascending: false });
 
     if (filterDate) query = query.eq("date", filterDate);
 
-    const { data } = await query;
+    const { data: attData, error } = await query;
 
-    if (data) {
-      let filtered = data;
-      if (filterName) {
-        filtered = data.filter((r) =>
-          r.profiles?.full_name?.toLowerCase().includes(filterName.toLowerCase())
-        );
-      }
-      setAttendance(filtered);
+    if (error) { console.log("Attendance error:", error.message); return; }
 
-      
-      const today = new Date().toISOString().split("T")[0];
-      const todayData = data.filter((r) => r.date === today);
-      const allEmployees = await supabase.from("profiles").select("id").eq("role", "employee");
-      setStats({
-        total: allEmployees.data?.length || 0,
-        present: todayData.filter((r) => r.status === "present").length,
-        late: todayData.filter((r) => r.status === "late").length,
-        absent: todayData.filter((r) => r.status === "absent").length,
-      });
+    if (!attData || attData.length === 0) {
+      setAttendance([]);
+      const { data: allEmployees } = await supabase
+        .from("profiles").select("id").eq("role", "employee");
+      setStats({ total: allEmployees?.length || 0, present: 0, late: 0, absent: 0 });
+      return;
     }
+
+    const userIds = [...new Set(attData.map((r) => r.user_id))];
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, full_name, department, avatar_url")
+      .in("id", userIds);
+
+    const merged = attData.map((r) => ({
+      ...r,
+      profiles: profilesData?.find((p) => p.id === r.user_id) || null,
+    }));
+
+    const filtered = filterName
+      ? merged.filter((r) =>
+          r.profiles?.full_name?.toLowerCase().includes(filterName.toLowerCase())
+        )
+      : merged;
+
+    setAttendance(filtered);
+
+    const today = new Date().toISOString().split("T")[0];
+    const todayData = merged.filter((r) => r.date === today);
+    const { data: allEmployees } = await supabase
+      .from("profiles").select("id").eq("role", "employee");
+
+    setStats({
+      total: allEmployees?.length || 0,
+      present: todayData.filter((r) => r.status === "present").length,
+      late:    todayData.filter((r) => r.status === "late").length,
+      absent:  todayData.filter((r) => r.status === "absent").length,
+    });
   }, [filterDate, filterName]);
 
   const fetchEmployees = useCallback(async () => {
@@ -83,17 +107,22 @@ const AdminPanel = () => {
     if (data) setEmployees(data);
   }, []);
 
-
-
+  
   useEffect(() => {
     if (!user) return;
-    const load = async () => {
+    (async () => {
       await fetchAdminProfile();
       await fetchAttendance();
       await fetchEmployees();
-    };
-    load();
-  }, [user, fetchAdminProfile, fetchAttendance, fetchEmployees]);
+    })();
+  
+  }, [user]); 
+
+ 
+  useEffect(() => {
+    if (!user) return;
+    (async () => { await fetchAttendance(); })();
+  }, [filterDate, filterName]); 
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -107,7 +136,8 @@ const AdminPanel = () => {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (menuOpen &&
+      if (
+        menuOpen &&
         !e.target.closest(".admin-mobile-dropdown") &&
         !e.target.closest(".admin-hamburger")
       ) setMenuOpen(false);
@@ -116,24 +146,20 @@ const AdminPanel = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-
-  useEffect(() => {
-    if (user) fetchAttendance();
-  }, [filterDate, filterName, fetchAttendance]);
-
- 
+  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
 
+  
   const handleEditClick = (record) => {
     setEditRecord(record);
     setEditFields({
-      clock_in: record.clock_in || "",
+      clock_in:  record.clock_in  || "",
       clock_out: record.clock_out || "",
-      status: record.status || "present",
-      date: record.date || "",
+      status:    record.status    || "present",
+      date:      record.date      || "",
     });
     setShowEditModal(true);
   };
@@ -142,26 +168,58 @@ const AdminPanel = () => {
     const { error } = await supabase
       .from("attendance")
       .update({
-        clock_in: editFields.clock_in,
+        clock_in:  editFields.clock_in,
         clock_out: editFields.clock_out,
-        status: editFields.status,
-        date: editFields.date,
+        status:    editFields.status,
+        date:      editFields.date,
       })
       .eq("id", editRecord.id);
 
+    if (error) { alert("Error saving: " + error.message); return; }
+
+    setShowEditModal(false);
+    await fetchAttendance();
+  };
+
+
+  const handleDeleteClick = (id) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    const { error } = await supabase
+      .from("attendance")
+      .delete()
+      .eq("id", deleteId);
+
     if (!error) {
-      setShowEditModal(false);
+      setShowDeleteModal(false);
+      setDeleteId(null);
       await fetchAttendance();
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
-    const { error } = await supabase.from("attendance").delete().eq("id", id);
-    if (!error) await fetchAttendance();
+  
+  const handleEditEmp = (emp) => {
+    setEditEmp(emp);
+    setEditEmpDept(emp.department || "");
+    setShowEmpEdit(true);
   };
 
- 
+  const handleSaveEmp = async () => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ department: editEmpDept })
+      .eq("id", editEmp.id);
+
+    if (!error) {
+      setShowEmpEdit(false);
+      await fetchEmployees();
+    }
+  };
+
+  
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -190,23 +248,53 @@ const AdminPanel = () => {
     );
   };
 
- 
+  
+
   return (
     <div className={`admin-layout ${darkMode ? "dark" : ""}`}>
 
      
-      {showEditModal && (
-        <div className="admin-modal-overlay" onClick={() => setShowEditModal(false)}>
+      {showEmpEdit && (
+        <div className="admin-modal-overlay" onClick={() => setShowEmpEdit(false)}>
           <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
-              <h2>Edit Attendance</h2>
-              <button className="admin-modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+              <h2>Edit Employee Department</h2>
+              <button className="admin-modal-close" onClick={() => setShowEmpEdit(false)}>✕</button>
             </div>
             <div className="admin-modal-body">
               <div className="admin-modal-field">
                 <label>Employee</label>
-                <input type="text" value={editRecord?.profiles?.full_name || ""} disabled />
+                <input type="text" value={editEmp?.full_name || ""} disabled />
               </div>
+              <div className="admin-modal-field">
+                <label>Department</label>
+                <select value={editEmpDept} onChange={(e) => setEditEmpDept(e.target.value)}>
+                  <option value="">Select Department</option>
+                  <option value="IT">IT</option>
+                  <option value="HR">HR</option>
+                  <option value="Accounting">Accounting</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Operations">Operations</option>
+                </select>
+              </div>
+            </div>
+            <div className="admin-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowEmpEdit(false)}>Cancel</button>
+              <button className="btn-save" onClick={handleSaveEmp}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    
+      {showEditModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h2>Edit Attendance Record</h2>
+              <button className="admin-modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+            <div className="admin-modal-body">
               <div className="admin-modal-field">
                 <label>Date</label>
                 <input
@@ -245,7 +333,24 @@ const AdminPanel = () => {
             </div>
             <div className="admin-modal-footer">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="btn-save" onClick={handleSaveEdit}>Save Changes</button>
+              <button className="btn-save" onClick={handleSaveEdit}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+   
+      {showDeleteModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="admin-modal-box delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-icon">
+              <img src={trashGif} alt="delete" width={80} height={80} />
+            </div>
+            <h2>Delete Record</h2>
+            <p>Are you sure you want to delete this attendance record? This action cannot be undone.</p>
+            <div className="admin-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className="btn-confirm-delete" onClick={handleConfirmDelete}>Yes, Delete</button>
             </div>
           </div>
         </div>
@@ -269,7 +374,10 @@ const AdminPanel = () => {
           </div>
         </nav>
         <div className="admin-sidebar-user">
-          <div className="admin-user-avatar" style={{ background: getAvatarColor(adminProfile?.full_name) }}>
+          <div
+            className="admin-user-avatar"
+            style={{ background: getAvatarColor(adminProfile?.full_name) }}
+          >
             {adminProfile?.avatar_url
               ? <img src={adminProfile.avatar_url} alt="avatar" />
               : getInitials(adminProfile?.full_name)
@@ -282,15 +390,13 @@ const AdminPanel = () => {
         </div>
       </aside>
 
-    
+     
       <div className="admin-main">
-
-       
         <div className="admin-topbar">
           <button className="admin-hamburger" onClick={() => setMenuOpen(!menuOpen)}>
-            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`}></span>
-            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`}></span>
-            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`}></span>
+            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`} />
+            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`} />
+            <span className={`admin-ham-line ${menuOpen ? "open" : ""}`} />
           </button>
           <h1>Attendance Dashboard</h1>
           <div className="admin-topbar-actions">
@@ -304,7 +410,6 @@ const AdminPanel = () => {
           </div>
         </div>
 
-     
         <div className={`admin-mobile-dropdown ${menuOpen ? "open" : ""}`}>
           <div className="admin-dropdown-divider" />
           <div
@@ -327,27 +432,27 @@ const AdminPanel = () => {
 
         <div className="admin-content">
 
-       
+        
           <div className="admin-stat-cards">
             <div className="admin-stat-card">
-              <h3>Total Of Employee</h3>
+              <h3>Total Employees</h3>
               <p>{stats.total}</p>
             </div>
             <div className="admin-stat-card">
-              <h3>Total of Present</h3>
+              <h3>Present Today</h3>
               <p>{stats.present}</p>
             </div>
             <div className="admin-stat-card">
-              <h3>Total of Late</h3>
+              <h3>Late Today</h3>
               <p>{stats.late}</p>
             </div>
             <div className="admin-stat-card">
-              <h3>Total of Absent</h3>
+              <h3>Absent Today</h3>
               <p>{stats.absent}</p>
             </div>
           </div>
 
-        
+   
           {activeNav === "attendance" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -408,14 +513,18 @@ const AdminPanel = () => {
                           </div>
                         </td>
                         <td>{r.profiles?.department || "--"}</td>
-                        <td>{new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
+                        <td>
+                          {new Date(r.date).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                          })}
+                        </td>
                         <td>{formatTime(r.clock_in)}</td>
                         <td>{formatTime(r.clock_out)}</td>
                         <td>{getStatusBadge(r.status)}</td>
                         <td>
                           <div className="action-btns">
                             <button className="btn-edit" onClick={() => handleEditClick(r)}>Edit</button>
-                            <button className="btn-delete" onClick={() => handleDelete(r.id)}>Delete</button>
+                            <button className="btn-delete" onClick={() => handleDeleteClick(r.id)}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -426,6 +535,7 @@ const AdminPanel = () => {
             </div>
           )}
 
+       
           {activeNav === "employee" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -441,6 +551,7 @@ const AdminPanel = () => {
                       <th>Email</th>
                       <th>Department</th>
                       <th>Role</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -463,6 +574,11 @@ const AdminPanel = () => {
                         <td>{emp.email || "--"}</td>
                         <td>{emp.department || "--"}</td>
                         <td><span className="emp-role-badge">{emp.role}</span></td>
+                        <td>
+                          <div className="action-btns">
+                            <button className="btn-edit" onClick={() => handleEditEmp(emp)}>Edit</button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -470,6 +586,7 @@ const AdminPanel = () => {
               )}
             </div>
           )}
+
         </div>
       </div>
     </div>

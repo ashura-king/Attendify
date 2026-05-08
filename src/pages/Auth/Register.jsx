@@ -11,6 +11,7 @@ function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false)
+  const [department, setDepartment] = useState("");
 
   const navigate = useNavigate();
 
@@ -55,7 +56,7 @@ function Register() {
     return;
   }
 
-  console.log("User + profile created ✅");
+
   navigate("/login");
 };
 
@@ -112,6 +113,21 @@ function Register() {
                 required
               />
             </div>
+            <div className="form-group">
+  <label>Department</label>
+  <select
+    value={department}
+    onChange={(e) => setDepartment(e.target.value)}
+    required
+  >
+    <option value="">Select Department</option>
+    <option value="IT">IT</option>
+    <option value="HR">HR</option>
+    <option value="Accounting">Accounting</option>
+    <option value="Marketing">Marketing</option>
+    <option value="Operations">Operations</option>
+  </select>
+</div>
 
             <div className="form-group">
               <label>Password</label>

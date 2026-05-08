@@ -82,9 +82,25 @@ body {
 }
 
 .register-subtitle {
-  color: #888;
+  color: #1d1c1c;
   font-size: 14px;
   margin-bottom: 32px;
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #0c0c0c;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #ffffff;
+  background: rgb(33, 81, 8);
+  outline: none;
+  cursor: pointer;
+}
+
+select:focus {
+  border-color: #f7f7f7;
 }
 
 /* FORM */

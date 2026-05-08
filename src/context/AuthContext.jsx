@@ -29,9 +29,11 @@ export const AuthProvider = ({ children }) => {
       .select('role')
       .eq('id', userId)
       .single()
+    console.log("Fetched role:", data?.role)
     setRole(data?.role ?? null)
     setLoading(false)
   }
+
 
   return (
     <AuthContext.Provider value={{ user, role, loading }}>

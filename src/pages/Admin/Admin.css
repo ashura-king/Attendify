@@ -580,3 +580,45 @@ body.dark {
   .admin-stat-card p { font-size: 20px; }
   .admin-topbar h1 { font-size: 13px; }
 }
+.delete-modal {
+  text-align: center;
+  padding: 32px 24px;
+  max-width: 360px;
+}
+
+.delete-modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.delete-modal h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.delete-modal p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.btn-confirm-delete {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-confirm-delete:hover { background: #dc2626; }
+
+/* Dark mode */
+.app-layout.dark .delete-modal h2 { color: #f1f5f9; }
+.app-layout.dark .delete-modal p { color: #94a3b8; }

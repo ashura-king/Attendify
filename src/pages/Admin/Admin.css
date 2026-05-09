@@ -619,6 +619,14 @@ body.dark {
 
 .btn-confirm-delete:hover { background: #dc2626; }
 
-/* Dark mode */
 .app-layout.dark .delete-modal h2 { color: #f1f5f9; }
 .app-layout.dark .delete-modal p { color: #94a3b8; }
+
+.overtime-badge {
+  background: #ede9fe;
+  color: #7c3aed;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}

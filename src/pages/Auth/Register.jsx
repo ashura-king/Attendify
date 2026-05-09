@@ -10,59 +10,62 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
   const [department, setDepartment] = useState("");
 
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (password !== confirmPassword) {
-    alert("Passwords do not match");
-    return;
-  }
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: username  
-      }
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
     }
-  });
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  const user = data.user;
-
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .upsert([
-      {
-        id: user.id,         
-        full_name: username,  
-        email: email,
-        role: "employee"    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: username }
       }
-    ]);
+    });
 
-  if (profileError) {
-    alert(profileError.message);
-    return;
-  }
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
+    // FIX 3: data.user can be null if Supabase requires email confirmation
+    if (!data.user) {
+      alert("Registration successful! Please check your email to confirm your account.");
+      navigate("/login");
+      return;
+    }
 
-  navigate("/login");
-};
+    // FIX 2: department is now included in the upsert
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert([{
+        id: data.user.id,
+        full_name: username,
+        email,
+        department,       // ← was missing before
+        role: "employee",
+      }]);
+
+    if (profileError) {
+      alert(profileError.message);
+      return;
+    }
+
+    navigate("/login");
+  };
 
   return (
     <div className="register-wrapper">
       <div className="register-left">
+        <div className="liquid-bg" />
         <div className="brand">
           <div className="brandIcon">
             <h1>Attendify</h1>
@@ -74,19 +77,12 @@ function Register() {
       <div className="register-right">
         <div className="register-card">
 
-          {/* Tab Toggle */}
           <div className="auth-tabs">
             <div className="tab-slider tab-slider--right" />
-            <button
-         className="tab-btn"
-         onClick={() => navigate('/login')}
-            >
-         Sign In
-        </button>
-            <button
-              className="tab-btn active"
-              onClick={() => navigate('/register')}
-            >
+            <button className="tab-btn" onClick={() => navigate('/login')}>
+              Sign In
+            </button>
+            <button className="tab-btn active" onClick={() => navigate('/register')}>
               Register
             </button>
           </div>
@@ -113,21 +109,22 @@ function Register() {
                 required
               />
             </div>
+
             <div className="form-group">
-  <label>Department</label>
-  <select
-    value={department}
-    onChange={(e) => setDepartment(e.target.value)}
-    required
-  >
-    <option value="">Select Department</option>
-    <option value="IT">IT</option>
-    <option value="HR">HR</option>
-    <option value="Accounting">Accounting</option>
-    <option value="Marketing">Marketing</option>
-    <option value="Operations">Operations</option>
-  </select>
-</div>
+              <label>Department</label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                required
+              >
+                <option value="">Select Department</option>
+                <option value="IT">IT</option>
+                <option value="HR">HR</option>
+                <option value="Accounting">Accounting</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Operations">Operations</option>
+              </select>
+            </div>
 
             <div className="form-group">
               <label>Password</label>
@@ -138,6 +135,7 @@ function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                {/* FIX 1: toggle-password button has no navigate, just toggles visibility */}
                 <button
                   type="button"
                   className="toggle-password"
@@ -160,13 +158,10 @@ function Register() {
               </div>
             </div>
 
-    <button
-     type="submit"
-     className="create_account"
-        onClick={() => navigate('/login')}
-        >
-        Create Account
-        </button>
+            {/* FIX 1: removed onClick navigate — handleSubmit handles navigation after success */}
+            <button type="submit" className="create_account">
+              Create Account
+            </button>
           </form>
 
         </div>

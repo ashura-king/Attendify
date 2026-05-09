@@ -1,8 +1,9 @@
-import { useEffect, useState,useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import './Dashboard.css';
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
+import EmployeeLeaveSection from "./EmployeeLeave";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -39,116 +40,100 @@ const Dashboard = () => {
   // ===== FETCH FUNCTIONS =====
 
   const fetchProfile = useCallback(async () => {
-  const { data } = await supabase
-    .from("profiles")
-    .select("full_name, role, email, avatar_url")
-    .eq("id", user.id)
-    .single();
-  if (data) {
-    setProfile(data);
-    setEditName(data?.full_name || "");
-    setEditEmail(data?.email || user?.email || "");
-    setAvatarPreview(data?.avatar_url || null);
-  }
-}, [user]);
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, role, email, avatar_url")
+      .eq("id", user.id)
+      .single();
+    if (data) {
+      setProfile(data);
+      setEditName(data?.full_name || "");
+      setEditEmail(data?.email || user?.email || "");
+      setAvatarPreview(data?.avatar_url || null);
+    }
+  }, [user]);
 
-const fetchTodayRecord = useCallback(async () => {
-  const today = new Date().toISOString().split("T")[0];
-  const { data } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("date", today)
-    .single();
-  setTodayRecord(data || null);
-}, [user]);
+  const fetchTodayRecord = useCallback(async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .single();
+    setTodayRecord(data || null);
+  }, [user]);
 
-const fetchHistory = useCallback(async () => {
-  const { data } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("date", { ascending: false })
-    .limit(10);
-  if (data) {
-    setHistory(data);
-    setSummary({
-      present: data.filter((r) => r.status === "present").length,
-      late: data.filter((r) => r.status === "late").length,
-      absent: data.filter((r) => r.status === "absent").length,
-    });
-  }
-}, [user]);
+  const fetchHistory = useCallback(async () => {
+    const { data } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(10);
+    if (data) {
+      setHistory(data);
+      setSummary({
+        present: data.filter((r) => r.status === "present").length,
+        late: data.filter((r) => r.status === "late").length,
+        absent: data.filter((r) => r.status === "absent").length,
+      });
+    }
+  }, [user]);
 
-const fetchMonthlyRecords = useCallback(async () => {
-  const [year, month] = selectedMonth.split("-");
-  const from = `${year}-${month}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const to = `${year}-${month}-${lastDay}`;
-  const { data } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", user.id)
-    .gte("date", from)
-    .lte("date", to)
-    .order("date", { ascending: false });
-  setMonthlyRecords(data || []);
-}, [user, selectedMonth]);
+  const fetchMonthlyRecords = useCallback(async () => {
+    const [year, month] = selectedMonth.split("-");
+    const from = `${year}-${month}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${month}-${lastDay}`;
+    const { data } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", from)
+      .lte("date", to)
+      .order("date", { ascending: false });
+    setMonthlyRecords(data || []);
+  }, [user, selectedMonth]);
 
   // ===== USE EFFECTS =====
 
-  // Live clock
   useEffect(() => {
     const timer = setInterval(() => setcurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch data on login
   useEffect(() => {
-  if (!user) return;
+    if (!user) return;
+    (async () => {
+      await fetchProfile();
+      await fetchTodayRecord();
+      await fetchHistory();
+    })();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadData = async () => {
-    await fetchProfile();
-    await fetchTodayRecord();
-    await fetchHistory();
-  };
-
-  loadData();
-}, [user,fetchProfile,fetchTodayRecord,fetchHistory]);
-  // Fetch monthly records when nav changes
   useEffect(() => {
-     if(!user || activeNav !== "records") return;
-     const loadRecords = async () =>{
-      await fetchMonthlyRecords();
-     };
+    if (!user || activeNav !== "records") return;
+    (async () => { await fetchMonthlyRecords(); })();
+  }, [user, activeNav, selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    loadRecords();
-  }, [user, activeNav, selectedMonth,fetchMonthlyRecords]);
-
-  // Dark mode
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  // Close menu on scroll
   useEffect(() => {
-    const handleScroll = () => {
-      if (menuOpen) setMenuOpen(false);
-    };
+    const handleScroll = () => { if (menuOpen) setMenuOpen(false); };
     window.addEventListener("scroll", handleScroll, true);
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [menuOpen]);
 
-  // Close menu on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
         menuOpen &&
         !e.target.closest(".mobile-dropdown") &&
         !e.target.closest(".hamburger")
-      ) {
-        setMenuOpen(false);
-      }
+      ) setMenuOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -181,9 +166,14 @@ const fetchMonthlyRecords = useCallback(async () => {
     setLoading(true);
     const timeStr = new Date().toTimeString().split(" ")[0];
 
+    const [inH, inM] = todayRecord.clock_in.split(":").map(Number);
+    const [outH, outM] = timeStr.split(":").map(Number);
+    const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+    const overtimeMinutes = Math.max(0, totalMinutes - 8 * 60);
+
     const { error } = await supabase
       .from("attendance")
-      .update({ clock_out: timeStr })
+      .update({ clock_out: timeStr, overtime_minutes: overtimeMinutes })
       .eq("id", todayRecord.id);
 
     if (!error) {
@@ -212,7 +202,6 @@ const fetchMonthlyRecords = useCallback(async () => {
     setProfileMsg({ type: "", text: "" });
 
     try {
-      // Upload avatar if changed
       let avatarUrl = profile?.avatar_url || null;
       if (avatar) {
         const fileExt = avatar.name.split(".").pop();
@@ -222,34 +211,23 @@ const fetchMonthlyRecords = useCallback(async () => {
           .upload(fileName, avatar, { upsert: true });
 
         if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from("Avatar")
-            .getPublicUrl(fileName);
+          const { data: urlData } = supabase.storage.from("Avatar").getPublicUrl(fileName);
           avatarUrl = urlData.publicUrl;
         }
       }
 
-      // Update profiles table
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({
-          full_name: editName,
-          avatar_url: avatarUrl,
-          email: editEmail,
-        })
+        .update({ full_name: editName, avatar_url: avatarUrl, email: editEmail })
         .eq("id", user.id);
 
       if (profileError) throw profileError;
 
-      // Update email in auth if changed
       if (editEmail && editEmail !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: editEmail,
-        });
+        const { error: emailError } = await supabase.auth.updateUser({ email: editEmail });
         if (emailError) throw emailError;
       }
 
-      // Update password only if user typed something
       if (editPassword && editPassword.trim() !== "") {
         if (editPassword !== confirmNewPassword) {
           setProfileMsg({ type: "error", text: "Passwords do not match!" });
@@ -261,25 +239,16 @@ const fetchMonthlyRecords = useCallback(async () => {
           setProfileLoading(false);
           return;
         }
-        const { error: passError } = await supabase.auth.updateUser({
-          password: editPassword,
-        });
+        const { error: passError } = await supabase.auth.updateUser({ password: editPassword });
         if (passError) throw passError;
       }
 
-   
-    setProfile((prev) => ({
-     ...prev,
-    full_name: editName,
-    email: editEmail,
-    avatar_url: avatarUrl,
-  }));
-  setAvatarPreview(avatarUrl);
-  setEditPassword("");
-  setConfirmNewPassword("");
-  setAvatar(null);
-  setProfileMsg({ type: "success", text: "Profile updated successfully!" });
-
+      setProfile((prev) => ({ ...prev, full_name: editName, email: editEmail, avatar_url: avatarUrl }));
+      setAvatarPreview(avatarUrl);
+      setEditPassword("");
+      setConfirmNewPassword("");
+      setAvatar(null);
+      setProfileMsg({ type: "success", text: "Profile updated successfully!" });
 
     } catch (err) {
       setProfileMsg({ type: "error", text: err.message });
@@ -305,6 +274,15 @@ const fetchMonthlyRecords = useCallback(async () => {
     return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
   };
 
+  const formatOvertime = (minutes) => {
+    if (!minutes || minutes === 0) return null;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hrs === 0) return `${mins}m overtime`;
+    if (mins === 0) return `${hrs}h overtime`;
+    return `${hrs}h ${mins}m overtime`;
+  };
+
   const getInitials = (name) => {
     if (!name) return "U";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
@@ -320,11 +298,10 @@ const fetchMonthlyRecords = useCallback(async () => {
   };
 
   const totalDays = summary.present + summary.late + summary.absent;
-
   const monthlySummary = {
     present: monthlyRecords.filter((r) => r.status === "present").length,
-    late: monthlyRecords.filter((r) => r.status === "late").length,
-    absent: monthlyRecords.filter((r) => r.status === "absent").length,
+    late:    monthlyRecords.filter((r) => r.status === "late").length,
+    absent:  monthlyRecords.filter((r) => r.status === "absent").length,
   };
 
   // ===== RENDER =====
@@ -336,13 +313,10 @@ const fetchMonthlyRecords = useCallback(async () => {
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-
             <div className="modal-header">
               <h2>Profile Settings</h2>
               <button className="modal-close" onClick={() => setShowProfile(false)}>✕</button>
             </div>
-
-            {/* AVATAR */}
             <div className="modal-avatar-section">
               <div className="modal-avatar">
                 {avatarPreview
@@ -352,71 +326,34 @@ const fetchMonthlyRecords = useCallback(async () => {
               </div>
               <label className="btn-change-avatar">
                 Change Photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarChange}
-                  style={{ display: "none" }}
-                />
+                <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
               </label>
             </div>
-
-            {/* FORM */}
             <div className="modal-form">
               <div className="modal-field">
                 <label>Full Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Enter full name"
-                />
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Enter full name" />
               </div>
-
               <div className="modal-field">
                 <label>Email</label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder="Enter email"
-                />
+                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Enter email" />
               </div>
-
               <div className="modal-divider" />
               <p className="modal-section-label">Change Password</p>
-
               <div className="modal-field">
                 <label>New Password</label>
-                <input
-                  type="password"
-                  value={editPassword}
-                  onChange={(e) => setEditPassword(e.target.value)}
-                  placeholder="Leave blank to keep current"
-                />
+                <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Leave blank to keep current" />
               </div>
-
               <div className="modal-field">
                 <label>Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                />
+                <input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Confirm new password" />
               </div>
-
               {profileMsg.text && (
                 <p className={`modal-msg ${profileMsg.type}`}>
                   {profileMsg.type === "success" ? "✓" : "✕"} {profileMsg.text}
                 </p>
               )}
-
-              <button
-                className="btn-save-profile"
-                onClick={handleSaveProfile}
-                disabled={profileLoading}
-              >
+              <button className="btn-save-profile" onClick={handleSaveProfile} disabled={profileLoading}>
                 {profileLoading ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -429,17 +366,14 @@ const fetchMonthlyRecords = useCallback(async () => {
         <div className="sidebar-logo">Attendify</div>
         <p className="sidebar-menu-label">Menu</p>
         <nav className="sidebar-nav">
-          <div
-            className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`}
-            onClick={() => setActiveNav("dashboard")}
-          >
+          <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => setActiveNav("dashboard")}>
             Dashboard
           </div>
-          <div
-            className={`nav-item ${activeNav === "records" ? "active" : ""}`}
-            onClick={() => setActiveNav("records")}
-          >
+          <div className={`nav-item ${activeNav === "records" ? "active" : ""}`} onClick={() => setActiveNav("records")}>
             My Records
+          </div>
+          <div className={`nav-item ${activeNav === "leave" ? "active" : ""}`} onClick={() => setActiveNav("leave")}>
+            My Leave
           </div>
         </nav>
         <div className="sidebar-user" onClick={() => setShowProfile(true)}>
@@ -462,11 +396,15 @@ const fetchMonthlyRecords = useCallback(async () => {
         {/* TOPBAR */}
         <div className="topbar">
           <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)}>
-            <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
-            <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
-            <span className={`ham-line ${menuOpen ? "open" : ""}`}></span>
+            <span className={`ham-line ${menuOpen ? "open" : ""}`} />
+            <span className={`ham-line ${menuOpen ? "open" : ""}`} />
+            <span className={`ham-line ${menuOpen ? "open" : ""}`} />
           </button>
-          <h1>{activeNav === "dashboard" ? "Attendance Dashboard" : "My Records"}</h1>
+          <h1>
+            {activeNav === "dashboard" ? "Attendance Dashboard"
+              : activeNav === "records" ? "My Records"
+              : "My Leave"}
+          </h1>
           <div className="topbar-actions">
             <button className="dark-mode-toggle" onClick={() => setDarkMode(!darkMode)}>
               <div className={`toggle-track ${darkMode ? "on" : ""}`}>
@@ -493,53 +431,28 @@ const fetchMonthlyRecords = useCallback(async () => {
             </div>
           </div>
           <div className="mobile-dropdown-divider" />
-          <div
-            className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`}
-            onClick={() => { setActiveNav("dashboard"); setMenuOpen(false); }}
-          >
-            Dashboard
-          </div>
-          <div
-            className={`nav-item ${activeNav === "records" ? "active" : ""}`}
-            onClick={() => { setActiveNav("records"); setMenuOpen(false); }}
-          >
-            My Records
-          </div>
-          <div
-            className="nav-item"
-            onClick={() => { setShowProfile(true); setMenuOpen(false); }}
-          >
-            ⚙ Profile Settings
-          </div>
+          <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => { setActiveNav("dashboard"); setMenuOpen(false); }}>Dashboard</div>
+          <div className={`nav-item ${activeNav === "records" ? "active" : ""}`} onClick={() => { setActiveNav("records"); setMenuOpen(false); }}>My Records</div>
+          <div className={`nav-item ${activeNav === "leave" ? "active" : ""}`} onClick={() => { setActiveNav("leave"); setMenuOpen(false); }}>My Leave</div>
+          <div className="nav-item" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>⚙ Profile Settings</div>
           <div className="mobile-dropdown-divider" />
-          <div className="nav-item nav-logout" onClick={() => { handleLogout(); setMenuOpen(false); }}>
-            Logout
-          </div>
+          <div className="nav-item nav-logout" onClick={() => { handleLogout(); setMenuOpen(false); }}>Logout</div>
         </div>
 
         {/* CONTENT */}
         <div className="dashboard-content">
 
-          {/* DASHBOARD VIEW */}
+          {/* ── DASHBOARD VIEW ── */}
           {activeNav === "dashboard" && (
             <>
               <div className="top-row">
                 <div className="welcome-card">
                   <h2>Welcome {profile?.full_name || "User"}</h2>
                   <div className="live-clock">
-                    {currentTime.toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                      hour12: false,
-                    })}
+                    {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
                   </div>
                   <div className="live-date">
-                    {currentTime.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {currentTime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </div>
 
                   {!todayRecord ? (
@@ -565,10 +478,7 @@ const fetchMonthlyRecords = useCallback(async () => {
                   <h3>Today's Summary</h3>
                   <div className="summary-row">
                     <span className="summary-label">Status</span>
-                    {todayRecord
-                      ? getStatusBadge(todayRecord.status)
-                      : <span className="no-status">Not clocked in</span>
-                    }
+                    {todayRecord ? getStatusBadge(todayRecord.status) : <span className="no-status">Not clocked in</span>}
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Time In</span>
@@ -581,6 +491,12 @@ const fetchMonthlyRecords = useCallback(async () => {
                   <div className="summary-row">
                     <span className="summary-label">Hours</span>
                     <span className="summary-value">{calcHours(todayRecord?.clock_in, todayRecord?.clock_out)}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Overtime</span>
+                    <span className="summary-value" style={{ color: todayRecord?.overtime_minutes > 0 ? "#7c3aed" : "#6b7280" }}>
+                      {formatOvertime(todayRecord?.overtime_minutes) || "--"}
+                    </span>
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Month</span>
@@ -614,11 +530,8 @@ const fetchMonthlyRecords = useCallback(async () => {
                   <table className="att-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Time In</th>
-                        <th>Time Out</th>
-                        <th>Hours</th>
-                        <th>Status</th>
+                        <th>Date</th><th>Time In</th><th>Time Out</th>
+                        <th>Hours</th><th>Overtime</th><th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -628,6 +541,9 @@ const fetchMonthlyRecords = useCallback(async () => {
                           <td>{formatTime(r.clock_in)}</td>
                           <td>{formatTime(r.clock_out)}</td>
                           <td>{calcHours(r.clock_in, r.clock_out)}</td>
+                          <td style={{ color: r.overtime_minutes > 0 ? "#7c3aed" : "#9ca3af" }}>
+                            {formatOvertime(r.overtime_minutes) || "--"}
+                          </td>
                           <td>{getStatusBadge(r.status)}</td>
                         </tr>
                       ))}
@@ -638,7 +554,7 @@ const fetchMonthlyRecords = useCallback(async () => {
             </>
           )}
 
-          {/* MY RECORDS VIEW */}
+          {/* ── MY RECORDS VIEW ── */}
           {activeNav === "records" && (
             <>
               <div className="records-header">
@@ -678,11 +594,8 @@ const fetchMonthlyRecords = useCallback(async () => {
                   <table className="att-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Time In</th>
-                        <th>Time Out</th>
-                        <th>Hours</th>
-                        <th>Status</th>
+                        <th>Date</th><th>Time In</th><th>Time Out</th>
+                        <th>Hours</th><th>Overtime</th><th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -692,6 +605,9 @@ const fetchMonthlyRecords = useCallback(async () => {
                           <td>{formatTime(r.clock_in)}</td>
                           <td>{formatTime(r.clock_out)}</td>
                           <td>{calcHours(r.clock_in, r.clock_out)}</td>
+                          <td style={{ color: r.overtime_minutes > 0 ? "#7c3aed" : "#9ca3af" }}>
+                            {formatOvertime(r.overtime_minutes) || "--"}
+                          </td>
                           <td>{getStatusBadge(r.status)}</td>
                         </tr>
                       ))}
@@ -701,6 +617,12 @@ const fetchMonthlyRecords = useCallback(async () => {
               </div>
             </>
           )}
+
+          {/* ── MY LEAVE VIEW ── */}
+          {activeNav === "leave" && (
+            <EmployeeLeaveSection />
+          )}
+
         </div>
       </div>
     </div>

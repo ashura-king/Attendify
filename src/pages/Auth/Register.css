@@ -8,13 +8,13 @@ body {
   font-family: 'Segoe UI', sans-serif;
 }
 
-/* WRAPPER */
+
 .register-wrapper {
   display: flex;
   height: 100vh;
 }
 
-/* LEFT SIDE */
+
 .register-left {
   flex: 1;
   background: linear-gradient(135deg, #000000, #1a1a1a, #145a32);
@@ -63,7 +63,7 @@ body {
   padding: 40px;
 }
 
-/* CARD */
+
 .register-card {
   background: #1a1a1a;
   border: 1px solid #2ecc71;
@@ -103,7 +103,6 @@ select:focus {
   border-color: #f7f7f7;
 }
 
-/* FORM */
 .register-form {
   display: flex;
   flex-direction: column;
@@ -142,7 +141,7 @@ select:focus {
   color: #555;
 }
 
-/* PASSWORD WRAPPER */
+
 .password-wrapper {
   position: relative;
   display: flex;
@@ -166,7 +165,7 @@ select:focus {
   color: #ffffff;
 }
 
-/* SUBMIT BUTTON */
+
 button[type="submit"] {
   padding: 14px;
   background: linear-gradient(135deg, #145a32, #2ecc71);
@@ -197,7 +196,7 @@ button[type="submit"]:hover {
   font-size: 16px;
   font-weight: 600;
 }
-/* AUTH TABS */
+
 .auth-tabs {
   position: relative;
   display: flex;
@@ -206,7 +205,7 @@ button[type="submit"]:hover {
   border-radius: 10px;
   padding: 4px;
   margin-bottom: 28px;
-  gap: 6px; /* adds space between buttons */
+  gap: 6px; 
 }
 
 .tab-btn {
@@ -222,14 +221,14 @@ button[type="submit"]:hover {
   transition: all 0.3s ease;
 }
 
-/* ACTIVE TAB */
+
 .tab-btn.active {
   background: linear-gradient(135deg, #145a32, #2ecc71);
   color: white;
   box-shadow: 0 4px 12px rgba(46, 204, 113, 0.25);
 }
 
-/* HOVER */
+
 .tab-btn:hover:not(.active) {
   background: #1f1f1f;
   color: #2ecc71;
@@ -256,7 +255,7 @@ button[type="submit"]:hover {
   background: #2ecc71;
   color: white;
 }
-/* RESPONSIVE */
+
 @media (max-width: 768px) {
   .register-wrapper {
     flex-direction: column;

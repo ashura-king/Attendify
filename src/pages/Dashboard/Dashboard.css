@@ -720,7 +720,6 @@ body.dark {
   .btn-timein, .btn-timeout { width: 100%; max-width: 240px; }
 }
 
-/* Small Mobile */
 @media (max-width: 480px) {
   .topbar h1 { font-size: 13px; }
   .live-clock { font-size: 26px; }
@@ -728,5 +727,14 @@ body.dark {
   .stat-number { font-size: 20px; }
   .stat-label { font-size: 10px; }
   .mobile-dropdown { top: 53px; }
+}
+
+.overtime-badge {
+  background: #ede9fe;
+  color: #7c3aed;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
 }
 

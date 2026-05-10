@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import './Dashboard.css';
@@ -19,7 +20,7 @@ const Dashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Profile modal states
+  
   const [showProfile, setShowProfile] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -30,15 +31,14 @@ const Dashboard = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMsg, setProfileMsg] = useState({ type: "", text: "" });
 
-  // Monthly records states
+
   const [monthlyRecords, setMonthlyRecords] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  // ===== FETCH FUNCTIONS =====
-
+  
   const fetchProfile = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
@@ -96,7 +96,7 @@ const Dashboard = () => {
     setMonthlyRecords(data || []);
   }, [user, selectedMonth]);
 
-  // ===== USE EFFECTS =====
+
 
   useEffect(() => {
     const timer = setInterval(() => setcurrentTime(new Date()), 1000);
@@ -110,12 +110,11 @@ const Dashboard = () => {
       await fetchTodayRecord();
       await fetchHistory();
     })();
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [user]); 
   useEffect(() => {
     if (!user || activeNav !== "records") return;
     (async () => { await fetchMonthlyRecords(); })();
-  }, [user, activeNav, selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, activeNav, selectedMonth]); 
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -139,26 +138,78 @@ const Dashboard = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  // ===== ATTENDANCE HANDLERS =====
+  
 
   const handleClockIn = async () => {
     setLoading(true);
     const now = new Date();
     const timeStr = now.toTimeString().split(" ")[0];
     const today = now.toISOString().split("T")[0];
-    const status = now.getHours() >= 9 ? "late" : "present";
 
-    const { error } = await supabase.from("attendance").insert({
-      user_id: user.id,
-      date: today,
-      clock_in: timeStr,
-      status,
-    });
+    const { data: existingRecord } = await supabase
+      .from("attendance")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .single();
 
-    if (!error) {
-      await fetchTodayRecord();
-      await fetchHistory();
+    
+    if (existingRecord) {
+      if (existingRecord.status === "absent") {
+
+        const { data: shiftData } = await supabase
+          .from("shift_settings")
+          .select("start_time, grace_period")
+          .eq("id", 1)
+          .single();
+
+        let status = "present";
+        if (shiftData) {
+          const [sh, sm] = shiftData.start_time.split(":").map(Number);
+          const cutoff = sh * 60 + sm + Number(shiftData.grace_period);
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          if (nowMin > cutoff) status = "late";
+        }
+
+        await supabase
+          .from("attendance")
+          .update({ clock_in: timeStr, status })
+          .eq("id", existingRecord.id);
+
+      } else {
+   
+        alert("You have already clocked in today.");
+        setLoading(false);
+        return;
+      }
+    } else {
+      
+      const { data: shiftData } = await supabase
+        .from("shift_settings")
+        .select("start_time, grace_period")
+        .eq("id", 1)
+        .single();
+
+      let status = "present";
+      if (shiftData) {
+        const [sh, sm] = shiftData.start_time.split(":").map(Number);
+        const cutoff = sh * 60 + sm + Number(shiftData.grace_period);
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        if (nowMin > cutoff) status = "late";
+      } else {
+        status = now.getHours() >= 9 ? "late" : "present";
+      }
+
+      await supabase.from("attendance").insert({
+        user_id: user.id,
+        date: today,
+        clock_in: timeStr,
+        status,
+      });
     }
+
+    await fetchTodayRecord();
+    await fetchHistory();
     setLoading(false);
   };
 
@@ -188,7 +239,7 @@ const Dashboard = () => {
     navigate("/login");
   };
 
-  // ===== PROFILE HANDLERS =====
+  
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -257,7 +308,7 @@ const Dashboard = () => {
     setProfileLoading(false);
   };
 
-  // ===== HELPER FUNCTIONS =====
+  
 
   const formatTime = (timeStr) => {
     if (!timeStr) return "--:--";
@@ -304,7 +355,7 @@ const Dashboard = () => {
     absent:  monthlyRecords.filter((r) => r.status === "absent").length,
   };
 
-  // ===== RENDER =====
+  
 
   return (
     <div className={`app-layout ${darkMode ? "dark" : ""}`}>
@@ -390,7 +441,7 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      {/* MAIN */}
+      
       <div className="main-area">
 
         {/* TOPBAR */}
@@ -416,7 +467,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* MOBILE DROPDOWN */}
+       
         <div className={`mobile-dropdown ${menuOpen ? "open" : ""}`}>
           <div className="mobile-dropdown-user">
             <div className="user-avatar">
@@ -439,10 +490,10 @@ const Dashboard = () => {
           <div className="nav-item nav-logout" onClick={() => { handleLogout(); setMenuOpen(false); }}>Logout</div>
         </div>
 
-        {/* CONTENT */}
+        
         <div className="dashboard-content">
 
-          {/* ── DASHBOARD VIEW ── */}
+         
           {activeNav === "dashboard" && (
             <>
               <div className="top-row">
@@ -554,7 +605,7 @@ const Dashboard = () => {
             </>
           )}
 
-          {/* ── MY RECORDS VIEW ── */}
+         
           {activeNav === "records" && (
             <>
               <div className="records-header">
@@ -618,7 +669,7 @@ const Dashboard = () => {
             </>
           )}
 
-          {/* ── MY LEAVE VIEW ── */}
+        
           {activeNav === "leave" && (
             <EmployeeLeaveSection />
           )}

@@ -23,7 +23,6 @@ const AdminPanel = () => {
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
   const [totalOvertime, setTotalOvertime] = useState(0);
 
-
   const [showEditModal, setShowEditModal] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
   const [editFields, setEditFields] = useState({ clock_in: "", clock_out: "", status: "", date: "" });
@@ -34,8 +33,9 @@ const AdminPanel = () => {
   const [showEmpEdit, setShowEmpEdit] = useState(false);
   const [editEmp, setEditEmp] = useState(null);
   const [editEmpDept, setEditEmpDept] = useState("");
+  const [showEmpDeleteModal, setShowEmpDeleteModal] = useState(false);
+  const [deleteEmp, setDeleteEmp] = useState(null);
 
- 
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leaveFilter, setLeaveFilter] = useState("all");
   const [showLeaveNoteModal, setShowLeaveNoteModal] = useState(false);
@@ -127,10 +127,24 @@ const AdminPanel = () => {
   const fetchLeaveRequests = useCallback(async () => {
     const { data, error } = await supabase
       .from("leave_requests")
-      .select("*, profiles(full_name, department, avatar_url)")
+      .select("*")
       .order("created_at", { ascending: false });
+
     if (error) { console.log("Leave error:", error.message); return; }
-    setLeaveRequests(data || []);
+    if (!data || data.length === 0) { setLeaveRequests([]); return; }
+
+    const userIds = [...new Set(data.map((r) => r.user_id))];
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, full_name, department, avatar_url")
+      .in("id", userIds);
+
+    const merged = data.map((r) => ({
+      ...r,
+      profiles: profilesData?.find((p) => p.id === r.user_id) || null,
+    }));
+
+    setLeaveRequests(merged);
   }, []);
 
   const fetchShift = useCallback(async () => {
@@ -143,15 +157,52 @@ const AdminPanel = () => {
     });
   }, []);
 
-  
+  const autoMarkAbsent = useCallback(async () => {
+    const { data: shiftData } = await supabase
+      .from("shift_settings")
+      .select("end_time")
+      .eq("id", 1)
+      .single();
+
+    if (!shiftData) return;
+
+    const now = new Date();
+    const [endH, endM] = shiftData.end_time.split(":").map(Number);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const endMinutes = endH * 60 + endM;
+    if (nowMinutes < endMinutes) return;
+
+    const today = now.toISOString().split("T")[0];
+
+    const { data: empList } = await supabase
+      .from("profiles").select("id").eq("role", "employee");
+
+    if (!empList || empList.length === 0) return;
+
+    const { data: existing } = await supabase
+      .from("attendance").select("user_id").eq("date", today);
+
+    const existingIds = new Set(existing?.map((r) => r.user_id) || []);
+
+    const absentRows = empList
+      .filter((e) => !existingIds.has(e.id))
+      .map((e) => ({ user_id: e.id, date: today, status: "absent" }));
+
+    if (absentRows.length === 0) return;
+
+    await supabase.from("attendance").insert(absentRows);
+  }, []);
+
+
   useEffect(() => {
     if (!user) return;
     (async () => {
       await fetchAdminProfile();
+      await fetchShift();
+      await autoMarkAbsent();
       await fetchAttendance();
       await fetchEmployees();
       await fetchLeaveRequests();
-      await fetchShift();
     })();
   }, [user]);
 
@@ -180,7 +231,7 @@ const AdminPanel = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
- 
+  
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/login"); };
 
   
@@ -218,7 +269,11 @@ const AdminPanel = () => {
   };
 
   
-  const handleEditEmp = (emp) => { setEditEmp(emp); setEditEmpDept(emp.department || ""); setShowEmpEdit(true); };
+  const handleEditEmp = (emp) => {
+    setEditEmp(emp);
+    setEditEmpDept(emp.department || "");
+    setShowEmpEdit(true);
+  };
 
   const handleSaveEmp = async () => {
     const { error } = await supabase
@@ -226,7 +281,20 @@ const AdminPanel = () => {
     if (!error) { setShowEmpEdit(false); await fetchEmployees(); }
   };
 
- 
+  const handleDeleteEmpClick = (emp) => { setDeleteEmp(emp); setShowEmpDeleteModal(true); };
+
+  const handleConfirmDeleteEmp = async () => {
+    await supabase.from("attendance").delete().eq("user_id", deleteEmp.id);
+    await supabase.from("leave_requests").delete().eq("user_id", deleteEmp.id);
+    await supabase.from("profiles").delete().eq("id", deleteEmp.id);
+    await supabase.rpc("delete_user", { user_id: deleteEmp.id });
+    setShowEmpDeleteModal(false);
+    setDeleteEmp(null);
+    await fetchEmployees();
+    await fetchAttendance();
+  };
+
+
   const openLeaveAction = (leave, action) => {
     setSelectedLeave(leave);
     setLeaveAction(action);
@@ -248,7 +316,37 @@ const AdminPanel = () => {
     ? leaveRequests
     : leaveRequests.filter((l) => l.status === leaveFilter);
 
+  
+  const downloadCSV = () => {
+    if (attendance.length === 0) return;
 
+    const headers = ["Employee", "Department", "Date", "Time In", "Time Out", "Overtime", "Status"];
+
+    const rows = attendance.map((r) => [
+      r.profiles?.full_name || "Unknown",
+      r.profiles?.department || "--",
+      formatDate(r.date),
+      formatTime(r.clock_in),
+      formatTime(r.clock_out),
+      formatOvertime(r.overtime_minutes) || "--",
+      r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "--",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const label = filterDate ? `_${filterDate}` : `_${new Date().toISOString().split("T")[0]}`;
+    link.download = `attendance${label}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  
   const handleSaveShift = async () => {
     setShiftSaving(true);
     const { error } = await supabase
@@ -264,7 +362,6 @@ const AdminPanel = () => {
     else alert("Error saving shift: " + error.message);
   };
 
-  
   const getInitials = (name) => {
     if (!name) return "U";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
@@ -319,11 +416,11 @@ const AdminPanel = () => {
 
   const navItems = ["attendance", "employee", "leave", "shift"];
 
-
+ 
   return (
     <div className={`admin-layout ${darkMode ? "dark" : ""}`}>
 
-    
+      {/* Employee Edit Modal */}
       {showEmpEdit && (
         <div className="admin-modal-overlay" onClick={() => setShowEmpEdit(false)}>
           <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -356,7 +453,27 @@ const AdminPanel = () => {
         </div>
       )}
 
-    
+      {/* Employee Delete Modal */}
+      {showEmpDeleteModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowEmpDeleteModal(false)}>
+          <div className="admin-modal-box delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="delete-modal-icon">
+              <img src={trashGif} alt="delete" width={80} height={80} />
+            </div>
+            <h2>Delete Employee</h2>
+            <p>
+              Are you sure you want to delete <strong>{deleteEmp?.full_name}</strong>?
+              This will permanently remove their account, attendance records, and leave requests.
+            </p>
+            <div className="admin-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowEmpDeleteModal(false)}>Cancel</button>
+              <button className="btn-confirm-delete" onClick={handleConfirmDeleteEmp}>Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Edit Modal */}
       {showEditModal && (
         <div className="admin-modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -398,7 +515,7 @@ const AdminPanel = () => {
         </div>
       )}
 
-      
+      {/* Attendance Delete Modal */}
       {showDeleteModal && (
         <div className="admin-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="admin-modal-box delete-modal" onClick={(e) => e.stopPropagation()}>
@@ -415,7 +532,7 @@ const AdminPanel = () => {
         </div>
       )}
 
- 
+      {/* Leave Action Modal */}
       {showLeaveNoteModal && (
         <div className="admin-modal-overlay" onClick={() => setShowLeaveNoteModal(false)}>
           <div className="admin-modal-box" onClick={(e) => e.stopPropagation()}>
@@ -430,7 +547,7 @@ const AdminPanel = () => {
               </div>
               <div className="admin-modal-field">
                 <label>Leave Type</label>
-                <input type="text" value={selectedLeave?.type || ""} disabled />
+                <input type="text" value={selectedLeave?.leave_type || ""} disabled />
               </div>
               <div className="admin-modal-field">
                 <label>Admin Note <span style={{ color: "#888", fontWeight: 400 }}>(optional)</span></label>
@@ -461,7 +578,7 @@ const AdminPanel = () => {
         </div>
       )}
 
-      
+      {/* Sidebar */}
       <aside className="admin-sidebar">
         <div className="admin-sidebar-logo">Attendify</div>
         <nav className="admin-sidebar-nav">
@@ -489,7 +606,7 @@ const AdminPanel = () => {
         </div>
       </aside>
 
-    
+      {/* Main */}
       <div className="admin-main">
         <div className="admin-topbar">
           <button className="admin-hamburger" onClick={() => setMenuOpen(!menuOpen)}>
@@ -509,7 +626,7 @@ const AdminPanel = () => {
           </div>
         </div>
 
-       
+        {/* Mobile Dropdown */}
         <div className={`admin-mobile-dropdown ${menuOpen ? "open" : ""}`}>
           <div className="admin-dropdown-divider" />
           {navItems.map((nav) => (
@@ -527,7 +644,7 @@ const AdminPanel = () => {
 
         <div className="admin-content">
 
-          
+          {/* Stat Cards */}
           <div className="admin-stat-cards">
             <div className="admin-stat-card"><h3>Total Employees</h3><p>{stats.total}</p></div>
             <div className="admin-stat-card"><h3>Present Today</h3><p>{stats.present}</p></div>
@@ -541,7 +658,7 @@ const AdminPanel = () => {
             </div>
           </div>
 
-      
+          {/* ── Attendance Tab ── */}
           {activeNav === "attendance" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -551,8 +668,17 @@ const AdminPanel = () => {
                     value={filterName} onChange={(e) => setFilterName(e.target.value)} />
                   <input type="date" className="admin-filter-input"
                     value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
-                  <button className="btn-cancel" onClick={() => { setFilterDate(""); setFilterName(""); }}>
+                  <button className="btn-cancel"
+                    onClick={() => { setFilterDate(""); setFilterName(""); }}>
                     Clear
+                  </button>
+                  <button
+                    className="btn-save"
+                    onClick={downloadCSV}
+                    disabled={attendance.length === 0}
+                    title="Download current records as CSV"
+                  >
+                    ⬇ Export CSV
                   </button>
                 </div>
               </div>
@@ -603,7 +729,7 @@ const AdminPanel = () => {
             </div>
           )}
 
-         
+          {/* ── Employee Tab ── */}
           {activeNav === "employee" && (
             <div className="admin-table-section">
               <div className="admin-table-header"><h2>Employees</h2></div>
@@ -634,6 +760,7 @@ const AdminPanel = () => {
                         <td>
                           <div className="action-btns">
                             <button className="btn-edit" onClick={() => handleEditEmp(emp)}>Edit</button>
+                            <button className="btn-delete" onClick={() => handleDeleteEmpClick(emp)}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -644,7 +771,7 @@ const AdminPanel = () => {
             </div>
           )}
 
-          
+          {/* ── Leave Tab ── */}
           {activeNav === "leave" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -687,7 +814,7 @@ const AdminPanel = () => {
                           </div>
                         </td>
                         <td>{l.profiles?.department || "--"}</td>
-                        <td>{l.type}</td>
+                        <td>{l.leave_type}</td>
                         <td>{formatDate(l.start_date)}</td>
                         <td>{formatDate(l.end_date)}</td>
                         <td style={{ maxWidth: 160 }}>
@@ -701,7 +828,9 @@ const AdminPanel = () => {
                               <button className="btn-confirm-delete" onClick={() => openLeaveAction(l, "rejected")}>Reject</button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: 13, color: "#888" }}>{l.admin_note || "—"}</span>
+                            <span style={{ fontSize: 13, color: "#888" }}>
+                              {l.admin_note?.trim() || "—"}
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -712,10 +841,10 @@ const AdminPanel = () => {
             </div>
           )}
 
-          {/* ── Shift Tab ── */}
+         
           {activeNav === "shift" && (
-            <div className="admin-table-section">
-              <div className="admin-table-header"><h2>Global Shift Settings</h2></div>
+            <div className="shift-wrapper">
+              <div className="shift-title"><h2>Global Shift Settings</h2></div>
               <div className="shift-settings-card">
                 <p className="shift-desc">
                   These settings apply to <strong>all employees</strong>. The system will automatically
@@ -738,7 +867,6 @@ const AdminPanel = () => {
                       onChange={(e) => setShift({ ...shift, grace_period: e.target.value })} />
                   </div>
                 </div>
-
                 <div className="shift-summary">
                   Employees clocking in after{" "}
                   <strong>
@@ -752,7 +880,6 @@ const AdminPanel = () => {
                   </strong>{" "}
                   will be marked <span className="badge-late">Late</span>.
                 </div>
-
                 <button
                   className="btn-save shift-save-btn"
                   onClick={handleSaveShift}

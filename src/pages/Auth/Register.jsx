@@ -36,14 +36,13 @@ function Register() {
       return;
     }
 
-    // FIX 3: data.user can be null if Supabase requires email confirmation
     if (!data.user) {
       alert("Registration successful! Please check your email to confirm your account.");
       navigate("/login");
       return;
     }
 
-    // FIX 2: department is now included in the upsert
+    
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert([{
@@ -135,7 +134,7 @@ function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                {/* FIX 1: toggle-password button has no navigate, just toggles visibility */}
+
                 <button
                   type="button"
                   className="toggle-password"
@@ -158,7 +157,7 @@ function Register() {
               </div>
             </div>
 
-            {/* FIX 1: removed onClick navigate — handleSubmit handles navigation after success */}
+            
             <button type="submit" className="create_account">
               Create Account
             </button>

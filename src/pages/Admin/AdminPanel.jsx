@@ -5,6 +5,8 @@ import "./Admin.css";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
 import trashGif from "../../assets/icons/trash.gif";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {faBell} from '@fortawesome/free-regular-svg-icons';
 
 const AdminPanel = () => {
   const { user } = useAuth();
@@ -29,7 +31,6 @@ const AdminPanel = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  
   const [showEmpEdit, setShowEmpEdit] = useState(false);
   const [editEmp, setEditEmp] = useState(null);
   const [editEmpDept, setEditEmpDept] = useState("");
@@ -43,10 +44,14 @@ const AdminPanel = () => {
   const [adminNote, setAdminNote] = useState("");
   const [leaveAction, setLeaveAction] = useState("");
 
- 
   const [shift, setShift] = useState({ start_time: "08:00", end_time: "17:00", grace_period: 15 });
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
+
+  
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
 
   const fetchAdminProfile = useCallback(async () => {
@@ -123,7 +128,49 @@ const AdminPanel = () => {
       .order("full_name");
     if (data) setEmployees(data);
   }, []);
+ 
+  const fetchNotifications = useCallback(async () => {
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
 
+  if (error) {
+    console.log("notif error:", error);
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    setNotifications([]);
+    setUnreadCount(0);
+    return;
+  }
+
+ 
+  const userIds = [...new Set(data.map((r) => r.user_id))];
+
+  
+  const { data: profilesData, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, full_name, avatar_url")
+    .in("id", userIds);
+
+  if (profileError) {
+    console.log("profile error:", profileError);
+  }
+
+  
+  const merged = data.map((r) => ({
+    ...r,
+    profiles: profilesData?.find((p) => p.id === r.user_id) || null,
+  }));
+
+  console.log("notif data:", merged);
+
+  setNotifications(merged);
+  setUnreadCount(merged.length);
+}, []);
   const fetchLeaveRequests = useCallback(async () => {
     const { data, error } = await supabase
       .from("leave_requests")
@@ -203,6 +250,7 @@ const AdminPanel = () => {
       await fetchAttendance();
       await fetchEmployees();
       await fetchLeaveRequests();
+      await fetchNotifications();
     })();
   }, [user]);
 
@@ -219,6 +267,7 @@ const AdminPanel = () => {
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [menuOpen]);
 
+ 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -226,15 +275,18 @@ const AdminPanel = () => {
         !e.target.closest(".admin-mobile-dropdown") &&
         !e.target.closest(".admin-hamburger")
       ) setMenuOpen(false);
+
+      if (showNotif && !e.target.closest(".notif-wrapper")) {
+        setShowNotif(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  }, [menuOpen, showNotif]);
 
-  
+
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/login"); };
 
-  
   const handleEditClick = (record) => {
     setEditRecord(record);
     setEditFields({
@@ -268,7 +320,6 @@ const AdminPanel = () => {
     if (!error) { setShowDeleteModal(false); setDeleteId(null); await fetchAttendance(); }
   };
 
-  
   const handleEditEmp = (emp) => {
     setEditEmp(emp);
     setEditEmpDept(emp.department || "");
@@ -294,7 +345,6 @@ const AdminPanel = () => {
     await fetchAttendance();
   };
 
-
   const openLeaveAction = (leave, action) => {
     setSelectedLeave(leave);
     setLeaveAction(action);
@@ -303,20 +353,43 @@ const AdminPanel = () => {
   };
 
   const handleLeaveDecision = async () => {
-    const { error } = await supabase
-      .from("leave_requests")
-      .update({ status: leaveAction, admin_note: adminNote })
-      .eq("id", selectedLeave.id);
-    if (error) { alert("Error: " + error.message); return; }
-    setShowLeaveNoteModal(false);
-    await fetchLeaveRequests();
-  };
+  const { error } = await supabase
+    .from("leave_requests")
+    .update({
+      status: leaveAction,
+      admin_note: adminNote,
+    })
+    .eq("id", selectedLeave.id);
 
+  if (error) {
+    alert("Error: " + error.message);
+    return;
+  }
+
+  
+  await supabase.from("notifications").insert({
+    user_id: selectedLeave.user_id,
+    title:
+      leaveAction === "approved"
+        ? "Leave Approved"
+        : "Leave Rejected",
+
+    message:
+      leaveAction === "approved"
+        ? `Your ${selectedLeave.leave_type} leave request was approved.`
+        : `Your ${selectedLeave.leave_type} leave request was rejected.`,
+
+    type: "leave",
+  });
+
+  setShowLeaveNoteModal(false);
+
+  await fetchLeaveRequests();
+};
   const filteredLeaves = leaveFilter === "all"
     ? leaveRequests
     : leaveRequests.filter((l) => l.status === leaveFilter);
 
-  
   const downloadCSV = () => {
     if (attendance.length === 0) return;
 
@@ -346,21 +419,50 @@ const AdminPanel = () => {
     URL.revokeObjectURL(url);
   };
 
-  
   const handleSaveShift = async () => {
-    setShiftSaving(true);
-    const { error } = await supabase
-      .from("shift_settings")
-      .update({
-        start_time:   shift.start_time,
-        end_time:     shift.end_time,
-        grace_period: Number(shift.grace_period),
-      })
-      .eq("id", 1);
-    setShiftSaving(false);
-    if (!error) { setShiftSaved(true); setTimeout(() => setShiftSaved(false), 2500); }
-    else alert("Error saving shift: " + error.message);
-  };
+  setShiftSaving(true);
+
+  const { error } = await supabase
+    .from("shift_settings")
+    .update({
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      grace_period: Number(shift.grace_period),
+    })
+    .eq("id", 1);
+
+  setShiftSaving(false);
+
+  if (error) {
+    alert("Error saving shift: " + error.message);
+    return;
+  }
+
+ 
+  const { data: employees } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "employee");
+
+  if (employees && employees.length > 0) {
+    const notifRows = employees.map((emp) => ({
+      user_id: emp.id,
+      title: "Shift Schedule Updated",
+      message: `Admin updated the work shift to ${formatTime(
+        shift.start_time
+      )} - ${formatTime(shift.end_time)}.`,
+      type: "shift",
+    }));
+
+    await supabase.from("notifications").insert(notifRows);
+  }
+
+  setShiftSaved(true);
+
+  setTimeout(() => {
+    setShiftSaved(false);
+  }, 2500);
+};
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -416,7 +518,6 @@ const AdminPanel = () => {
 
   const navItems = ["attendance", "employee", "leave", "shift"];
 
- 
   return (
     <div className={`admin-layout ${darkMode ? "dark" : ""}`}>
 
@@ -615,7 +716,56 @@ const AdminPanel = () => {
             <span className={`admin-ham-line ${menuOpen ? "open" : ""}`} />
           </button>
           <h1>Attendance Dashboard</h1>
+
+          
           <div className="admin-topbar-actions">
+
+            
+            <div className="notif-wrapper">
+            <button className="notif-btn" onClick={() => setShowNotif(!showNotif)}>
+               <FontAwesomeIcon icon={faBell} />
+                {unreadCount > 0 && (
+                <span className="notif-badge">{unreadCount}</span>
+                  )}
+                </button>
+              {showNotif && (
+                <div className="notif-dropdown">
+                  <div className="notif-header">
+                    <h3>Leave Requests</h3>
+                    <span>{unreadCount} pending</span>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="notif-empty">No pending leave requests</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className="notif-item"
+                        onClick={() => { setActiveNav("leave"); setShowNotif(false); }}
+                      >
+                        <div className="notif-avatar">
+                          {n.profiles?.full_name?.charAt(0).toUpperCase() || "U"}
+                        </div>
+                        <div className="notif-info">
+                          <p><strong>{n.profiles?.full_name}</strong> filed a leave</p>
+                          <span>{n.leave_type}</span>
+                          <span className="notif-date">
+                            {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div
+                    className="notif-footer"
+                    onClick={() => { setActiveNav("leave"); setShowNotif(false); }}
+                  >
+                    View all leave requests →
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button className="admin-dark-toggle" onClick={() => setDarkMode(!darkMode)}>
               <div className={`admin-toggle-track ${darkMode ? "on" : ""}`}>
                 <div className="admin-toggle-thumb" />
@@ -658,7 +808,7 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          {/* ── Attendance Tab ── */}
+          {/* Attendance Tab */}
           {activeNav === "attendance" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -729,7 +879,7 @@ const AdminPanel = () => {
             </div>
           )}
 
-          {/* ── Employee Tab ── */}
+      
           {activeNav === "employee" && (
             <div className="admin-table-section">
               <div className="admin-table-header"><h2>Employees</h2></div>
@@ -771,7 +921,7 @@ const AdminPanel = () => {
             </div>
           )}
 
-          {/* ── Leave Tab ── */}
+          {/* Leave Tab */}
           {activeNav === "leave" && (
             <div className="admin-table-section">
               <div className="admin-table-header">
@@ -841,7 +991,6 @@ const AdminPanel = () => {
             </div>
           )}
 
-         
           {activeNav === "shift" && (
             <div className="shift-wrapper">
               <div className="shift-title"><h2>Global Shift Settings</h2></div>

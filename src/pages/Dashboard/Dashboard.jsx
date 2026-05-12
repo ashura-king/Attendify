@@ -5,101 +5,167 @@ import './Dashboard.css';
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
 import EmployeeLeaveSection from "./EmployeeLeave";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBell } from "@fortawesome/free-regular-svg-icons";
+
+// ── Named constants ─────────────────────────────────────────────────────────
+const SHIFT_HOURS     = 8;
+const HISTORY_LIMIT   = 10;
+const MIN_PASSWORD_LEN = 6;
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [currentTime, setcurrentTime] = useState(new Date());
-  const [todayRecord, setTodayRecord] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [summary, setSummary] = useState({ present: 0, absent: 0, late: 0 });
-  const [loading, setLoading] = useState(false);
-  const [activeNav, setActiveNav] = useState("dashboard");
-  const [profile, setProfile] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime]               = useState(new Date()); // FIX: consistent camelCase
+  const [todayRecord, setTodayRecord]               = useState(null);
+  const [history, setHistory]                       = useState([]);
+  const [summary, setSummary]                       = useState({ present: 0, absent: 0, late: 0 });
+  const [loading, setLoading]                       = useState(false);
+  const [activeNav, setActiveNav]                   = useState("dashboard");
+  const [profile, setProfile]                       = useState(null);
+  const [darkMode, setDarkMode]                     = useState(false);
+  const [menuOpen, setMenuOpen]                     = useState(false);
+  const [clockInMsg, setClockInMsg]                 = useState(""); // FIX: replaces native alert()
 
-  
-  const [showProfile, setShowProfile] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editPassword, setEditPassword] = useState("");
+  const [showProfile, setShowProfile]               = useState(false);
+  const [editName, setEditName]                     = useState("");
+  const [editEmail, setEditEmail]                   = useState("");
+  const [editPassword, setEditPassword]             = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [avatar, setAvatar] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileMsg, setProfileMsg] = useState({ type: "", text: "" });
+  const [avatar, setAvatar]                         = useState(null);
+  const [avatarPreview, setAvatarPreview]           = useState(null);
+  const [profileLoading, setProfileLoading]         = useState(false);
+  const [profileMsg, setProfileMsg]                 = useState({ type: "", text: "" });
 
+  const [monthlyRecords, setMonthlyRecords]         = useState([]);
+  const [notifications, setNotifications]           = useState([]);
+  const [showNotif, setShowNotif]                   = useState(false);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  const [monthlyRecords, setMonthlyRecords] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  
-  const fetchProfile = useCallback(async () => {
+  // ── Shared helpers ──────────────────────────────────────────────────────────
+
+  // FIX: extracted into one reusable function — was duplicated twice in handleClockIn
+  const fetchShiftSettings = useCallback(async () => {
     const { data } = await supabase
+      .from("shift_settings")
+      .select("start_time, grace_period")
+      .eq("id", 1)
+      .single();
+    return data || null;
+  }, []);
+
+  const calcStatus = (shiftData, now) => {
+    if (!shiftData) return now.getHours() >= 9 ? "late" : "present";
+    const [sh, sm] = shiftData.start_time.split(":").map(Number);
+    const cutoff   = sh * 60 + sm + Number(shiftData.grace_period);
+    const nowMin   = now.getHours() * 60 + now.getMinutes();
+    return nowMin > cutoff ? "late" : "present";
+  };
+
+  // ── Data fetchers ───────────────────────────────────────────────────────────
+
+  const fetchProfile = useCallback(async () => {
+    const { data, error } = await supabase
       .from("profiles")
       .select("full_name, role, email, avatar_url")
       .eq("id", user.id)
       .single();
+    if (error) { console.error("fetchProfile:", error.message); return; }
     if (data) {
       setProfile(data);
-      setEditName(data?.full_name || "");
-      setEditEmail(data?.email || user?.email || "");
-      setAvatarPreview(data?.avatar_url || null);
+      setEditName(data.full_name || "");
+      setEditEmail(data.email || user?.email || "");
+      setAvatarPreview(data.avatar_url || null);
     }
   }, [user]);
 
   const fetchTodayRecord = useCallback(async () => {
     const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("attendance")
       .select("*")
       .eq("user_id", user.id)
       .eq("date", today)
       .single();
+    // FIX: PGRST116 = "no rows found" — not a real error, suppress it
+    if (error && error.code !== "PGRST116") {
+      console.error("fetchTodayRecord:", error.message);
+    }
     setTodayRecord(data || null);
   }, [user]);
 
   const fetchHistory = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("attendance")
       .select("*")
       .eq("user_id", user.id)
       .order("date", { ascending: false })
-      .limit(10);
+      .limit(HISTORY_LIMIT);
+    if (error) { console.error("fetchHistory:", error.message); return; }
+    if (data) setHistory(data);
+  }, [user]);
+
+  // FIX: summary now queries the full current month, not just the last 10 rows
+  // This means the stat cards on the Dashboard tab show accurate numbers
+  const fetchMonthlySummary = useCallback(async () => {
+    const now     = new Date();
+    const year    = now.getFullYear();
+    const month   = String(now.getMonth() + 1).padStart(2, "0");
+    const from    = `${year}-${month}-01`;
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+    const to      = `${year}-${month}-${lastDay}`;
+    const { data, error } = await supabase
+      .from("attendance")
+      .select("status")
+      .eq("user_id", user.id)
+      .gte("date", from)
+      .lte("date", to);
+    if (error) { console.error("fetchMonthlySummary:", error.message); return; }
     if (data) {
-      setHistory(data);
       setSummary({
         present: data.filter((r) => r.status === "present").length,
-        late: data.filter((r) => r.status === "late").length,
-        absent: data.filter((r) => r.status === "absent").length,
+        late:    data.filter((r) => r.status === "late").length,
+        absent:  data.filter((r) => r.status === "absent").length,
       });
     }
   }, [user]);
 
   const fetchMonthlyRecords = useCallback(async () => {
     const [year, month] = selectedMonth.split("-");
-    const from = `${year}-${month}-01`;
+    const from    = `${year}-${month}-01`;
     const lastDay = new Date(year, month, 0).getDate();
-    const to = `${year}-${month}-${lastDay}`;
-    const { data } = await supabase
+    const to      = `${year}-${month}-${lastDay}`;
+    const { data, error } = await supabase
       .from("attendance")
       .select("*")
       .eq("user_id", user.id)
       .gte("date", from)
       .lte("date", to)
       .order("date", { ascending: false });
+    if (error) { console.error("fetchMonthlyRecords:", error.message); return; }
     setMonthlyRecords(data || []);
   }, [user, selectedMonth]);
 
+  const fetchNotifications = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (error) { console.error("fetchNotifications:", error.message); return; }
+    setNotifications(data || []);
+  }, [user]);
 
+  // ── Effects ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const timer = setInterval(() => setcurrentTime(new Date()), 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -109,12 +175,15 @@ const Dashboard = () => {
       await fetchProfile();
       await fetchTodayRecord();
       await fetchHistory();
+      await fetchMonthlySummary(); // FIX: replaces fetchHistory-derived summary
+      await fetchNotifications();
     })();
-  }, [user]); 
+  }, [user]);
+
   useEffect(() => {
     if (!user || activeNav !== "records") return;
     (async () => { await fetchMonthlyRecords(); })();
-  }, [user, activeNav, selectedMonth]); 
+  }, [user, activeNav, selectedMonth]);
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -128,23 +197,32 @@ const Dashboard = () => {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (
-        menuOpen &&
-        !e.target.closest(".mobile-dropdown") &&
-        !e.target.closest(".hamburger")
-      ) setMenuOpen(false);
+      if (menuOpen && !e.target.closest(".mobile-dropdown") && !e.target.closest(".hamburger")) {
+        setMenuOpen(false);
+      }
+      if (showNotif && !e.target.closest(".notif-wrapper")) {
+        setShowNotif(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  }, [menuOpen, showNotif]);
 
-  
+  // FIX: auto-clear the inline clock-in message after 3s
+  useEffect(() => {
+    if (!clockInMsg) return;
+    const t = setTimeout(() => setClockInMsg(""), 3000);
+    return () => clearTimeout(t);
+  }, [clockInMsg]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleClockIn = async () => {
     setLoading(true);
-    const now = new Date();
+    setClockInMsg("");
+    const now     = new Date();
     const timeStr = now.toTimeString().split(" ")[0];
-    const today = now.toISOString().split("T")[0];
+    const today   = now.toISOString().split("T")[0];
 
     const { data: existingRecord } = await supabase
       .from("attendance")
@@ -153,56 +231,27 @@ const Dashboard = () => {
       .eq("date", today)
       .single();
 
-    
+    // FIX: shift settings fetched once, shared across both branches
+    const shiftData = await fetchShiftSettings();
+
     if (existingRecord) {
       if (existingRecord.status === "absent") {
-
-        const { data: shiftData } = await supabase
-          .from("shift_settings")
-          .select("start_time, grace_period")
-          .eq("id", 1)
-          .single();
-
-        let status = "present";
-        if (shiftData) {
-          const [sh, sm] = shiftData.start_time.split(":").map(Number);
-          const cutoff = sh * 60 + sm + Number(shiftData.grace_period);
-          const nowMin = now.getHours() * 60 + now.getMinutes();
-          if (nowMin > cutoff) status = "late";
-        }
-
+        const status = calcStatus(shiftData, now);
         await supabase
           .from("attendance")
           .update({ clock_in: timeStr, status })
           .eq("id", existingRecord.id);
-
       } else {
-   
-        alert("You have already clocked in today.");
+        // FIX: replaced blocking alert() with inline state message
+        setClockInMsg("You have already clocked in today.");
         setLoading(false);
         return;
       }
     } else {
-      
-      const { data: shiftData } = await supabase
-        .from("shift_settings")
-        .select("start_time, grace_period")
-        .eq("id", 1)
-        .single();
-
-      let status = "present";
-      if (shiftData) {
-        const [sh, sm] = shiftData.start_time.split(":").map(Number);
-        const cutoff = sh * 60 + sm + Number(shiftData.grace_period);
-        const nowMin = now.getHours() * 60 + now.getMinutes();
-        if (nowMin > cutoff) status = "late";
-      } else {
-        status = now.getHours() >= 9 ? "late" : "present";
-      }
-
+      const status = calcStatus(shiftData, now);
       await supabase.from("attendance").insert({
-        user_id: user.id,
-        date: today,
+        user_id:  user.id,
+        date:     today,
         clock_in: timeStr,
         status,
       });
@@ -210,17 +259,25 @@ const Dashboard = () => {
 
     await fetchTodayRecord();
     await fetchHistory();
+    await fetchMonthlySummary();
     setLoading(false);
   };
 
   const handleClockOut = async () => {
+    // FIX: null guard — prevents crash if todayRecord has no clock_in (race condition)
+    if (!todayRecord?.clock_in) {
+      console.error("handleClockOut: todayRecord or clock_in is missing");
+      return;
+    }
+
     setLoading(true);
     const timeStr = new Date().toTimeString().split(" ")[0];
 
-    const [inH, inM] = todayRecord.clock_in.split(":").map(Number);
+    const [inH, inM]   = todayRecord.clock_in.split(":").map(Number);
     const [outH, outM] = timeStr.split(":").map(Number);
     const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    const overtimeMinutes = Math.max(0, totalMinutes - 8 * 60);
+    // FIX: uses named constant instead of magic number 8
+    const overtimeMinutes = Math.max(0, totalMinutes - SHIFT_HOURS * 60);
 
     const { error } = await supabase
       .from("attendance")
@@ -230,6 +287,9 @@ const Dashboard = () => {
     if (!error) {
       await fetchTodayRecord();
       await fetchHistory();
+      await fetchMonthlySummary();
+    } else {
+      console.error("handleClockOut update:", error.message);
     }
     setLoading(false);
   };
@@ -238,8 +298,6 @@ const Dashboard = () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
-
-  
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -251,19 +309,18 @@ const Dashboard = () => {
   const handleSaveProfile = async () => {
     setProfileLoading(true);
     setProfileMsg({ type: "", text: "" });
-
     try {
       let avatarUrl = profile?.avatar_url || null;
       if (avatar) {
-        const fileExt = avatar.name.split(".").pop();
+        const fileExt  = avatar.name.split(".").pop();
         const fileName = `${user.id}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from("Avatar")
           .upload(fileName, avatar, { upsert: true });
-
         if (!uploadError) {
           const { data: urlData } = supabase.storage.from("Avatar").getPublicUrl(fileName);
-          avatarUrl = urlData.publicUrl;
+          // FIX: cache-buster so browser doesn't serve the old avatar after upsert
+          avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
         }
       }
 
@@ -271,7 +328,6 @@ const Dashboard = () => {
         .from("profiles")
         .update({ full_name: editName, avatar_url: avatarUrl, email: editEmail })
         .eq("id", user.id);
-
       if (profileError) throw profileError;
 
       if (editEmail && editEmail !== user.email) {
@@ -285,8 +341,9 @@ const Dashboard = () => {
           setProfileLoading(false);
           return;
         }
-        if (editPassword.length < 6) {
-          setProfileMsg({ type: "error", text: "Password must be at least 6 characters!" });
+        // FIX: uses named constant instead of magic number 6
+        if (editPassword.length < MIN_PASSWORD_LEN) {
+          setProfileMsg({ type: "error", text: `Password must be at least ${MIN_PASSWORD_LEN} characters!` });
           setProfileLoading(false);
           return;
         }
@@ -300,15 +357,13 @@ const Dashboard = () => {
       setConfirmNewPassword("");
       setAvatar(null);
       setProfileMsg({ type: "success", text: "Profile updated successfully!" });
-
     } catch (err) {
       setProfileMsg({ type: "error", text: err.message });
     }
-
     setProfileLoading(false);
   };
 
-  
+  // ── Pure helpers ─────────────────────────────────────────────────────────────
 
   const formatTime = (timeStr) => {
     if (!timeStr) return "--:--";
@@ -319,7 +374,7 @@ const Dashboard = () => {
 
   const calcHours = (clock_in, clock_out) => {
     if (!clock_in || !clock_out) return "--";
-    const [inH, inM] = clock_in.split(":").map(Number);
+    const [inH, inM]   = clock_in.split(":").map(Number);
     const [outH, outM] = clock_out.split(":").map(Number);
     const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
     return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
@@ -327,9 +382,9 @@ const Dashboard = () => {
 
   const formatOvertime = (minutes) => {
     if (!minutes || minutes === 0) return null;
-    const hrs = Math.floor(minutes / 60);
+    const hrs  = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    if (hrs === 0) return `${mins}m overtime`;
+    if (hrs === 0)  return `${mins}m overtime`;
     if (mins === 0) return `${hrs}h overtime`;
     return `${hrs}h ${mins}m overtime`;
   };
@@ -355,12 +410,12 @@ const Dashboard = () => {
     absent:  monthlyRecords.filter((r) => r.status === "absent").length,
   };
 
-  
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className={`app-layout ${darkMode ? "dark" : ""}`}>
 
-      {/* PROFILE MODAL */}
+      {/* ── PROFILE MODAL ── */}
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -412,20 +467,14 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* SIDEBAR */}
+      {/* ── SIDEBAR ── */}
       <aside className="sidebar">
         <div className="sidebar-logo">Attendify</div>
         <p className="sidebar-menu-label">Menu</p>
         <nav className="sidebar-nav">
-          <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => setActiveNav("dashboard")}>
-            Dashboard
-          </div>
-          <div className={`nav-item ${activeNav === "records" ? "active" : ""}`} onClick={() => setActiveNav("records")}>
-            My Records
-          </div>
-          <div className={`nav-item ${activeNav === "leave" ? "active" : ""}`} onClick={() => setActiveNav("leave")}>
-            My Leave
-          </div>
+          <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => setActiveNav("dashboard")}>Dashboard</div>
+          <div className={`nav-item ${activeNav === "records"   ? "active" : ""}`} onClick={() => setActiveNav("records")}>My Records</div>
+          <div className={`nav-item ${activeNav === "leave"     ? "active" : ""}`} onClick={() => setActiveNav("leave")}>My Leave</div>
         </nav>
         <div className="sidebar-user" onClick={() => setShowProfile(true)}>
           <div className="user-avatar">
@@ -441,10 +490,9 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      
       <div className="main-area">
 
-        {/* TOPBAR */}
+        {/* ── TOPBAR ── */}
         <div className="topbar">
           <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)}>
             <span className={`ham-line ${menuOpen ? "open" : ""}`} />
@@ -456,6 +504,7 @@ const Dashboard = () => {
               : activeNav === "records" ? "My Records"
               : "My Leave"}
           </h1>
+
           <div className="topbar-actions">
             <button className="dark-mode-toggle" onClick={() => setDarkMode(!darkMode)}>
               <div className={`toggle-track ${darkMode ? "on" : ""}`}>
@@ -463,11 +512,70 @@ const Dashboard = () => {
               </div>
               {darkMode ? "Light Mode" : "Dark Mode"}
             </button>
+
+            {/* ── NOTIFICATIONS — sits right beside the dark mode toggle ── */}
+            <div className="notif-wrapper">
+              <button
+                className="notif-btn"
+                onClick={async () => {
+                  const newState = !showNotif;
+                  setShowNotif(newState);
+                  if (newState && unreadCount > 0) {
+                    await supabase
+                      .from("notifications")
+                      .update({ is_read: true })
+                      .eq("user_id", user.id)
+                      .eq("is_read", false);
+                    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+                  }
+                }}
+              >
+                <FontAwesomeIcon icon={faBell} />
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+              </button>
+
+              {showNotif && (
+                <div className="notif-dropdown">
+                  <div className="notif-header">
+                    <h3>Notifications</h3>
+                    {notifications.length > 0 && (
+                      <button
+                        className="notif-clear-btn"
+                        onClick={async () => {
+                          const { error } = await supabase
+                            .from("notifications")
+                            .delete()
+                            .eq("user_id", user.id);
+                          if (!error) setNotifications([]);
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="notif-empty">No notifications</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div key={n.id} className={`notif-item ${!n.is_read ? "unread" : ""}`}>
+                        <div className="notif-info">
+                          <p>{n.message}</p>
+                          <span className="notif-date">
+                            {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
             <button onClick={handleLogout} className="btn-logout">Logout</button>
           </div>
         </div>
 
-       
+        {/* ── MOBILE DROPDOWN ── */}
         <div className={`mobile-dropdown ${menuOpen ? "open" : ""}`}>
           <div className="mobile-dropdown-user">
             <div className="user-avatar">
@@ -483,17 +591,17 @@ const Dashboard = () => {
           </div>
           <div className="mobile-dropdown-divider" />
           <div className={`nav-item ${activeNav === "dashboard" ? "active" : ""}`} onClick={() => { setActiveNav("dashboard"); setMenuOpen(false); }}>Dashboard</div>
-          <div className={`nav-item ${activeNav === "records" ? "active" : ""}`} onClick={() => { setActiveNav("records"); setMenuOpen(false); }}>My Records</div>
-          <div className={`nav-item ${activeNav === "leave" ? "active" : ""}`} onClick={() => { setActiveNav("leave"); setMenuOpen(false); }}>My Leave</div>
+          <div className={`nav-item ${activeNav === "records"   ? "active" : ""}`} onClick={() => { setActiveNav("records");   setMenuOpen(false); }}>My Records</div>
+          <div className={`nav-item ${activeNav === "leave"     ? "active" : ""}`} onClick={() => { setActiveNav("leave");     setMenuOpen(false); }}>My Leave</div>
           <div className="nav-item" onClick={() => { setShowProfile(true); setMenuOpen(false); }}>⚙ Profile Settings</div>
           <div className="mobile-dropdown-divider" />
           <div className="nav-item nav-logout" onClick={() => { handleLogout(); setMenuOpen(false); }}>Logout</div>
         </div>
 
-        
+        {/* ── MAIN CONTENT ── */}
         <div className="dashboard-content">
 
-         
+          {/* DASHBOARD TAB */}
           {activeNav === "dashboard" && (
             <>
               <div className="top-row">
@@ -505,6 +613,9 @@ const Dashboard = () => {
                   <div className="live-date">
                     {currentTime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </div>
+
+                  {/* FIX: inline message replaces native alert() */}
+                  {clockInMsg && <p className="clock-in-msg">{clockInMsg}</p>}
 
                   {!todayRecord ? (
                     <>
@@ -545,31 +656,34 @@ const Dashboard = () => {
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Overtime</span>
-                    <span className="summary-value" style={{ color: todayRecord?.overtime_minutes > 0 ? "#7c3aed" : "#6b7280" }}>
+                    {/* FIX: color driven by CSS class, not inline style */}
+                    <span className={`summary-value ${todayRecord?.overtime_minutes > 0 ? "overtime-active" : "overtime-none"}`}>
                       {formatOvertime(todayRecord?.overtime_minutes) || "--"}
                     </span>
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">Month</span>
+                    {/* FIX: uses full-month summary, not last-10-row count */}
                     <span className="summary-value">{summary.present + summary.late}/{totalDays || 0}</span>
                   </div>
                 </div>
               </div>
 
+              {/* FIX: stat cards now show accurate full-month counts */}
               <div className="stat-cards">
                 <div className="stat-card">
                   <span className="stat-number present">{summary.present}</span>
-                  <span className="stat-label">Days of Present</span>
+                  <span className="stat-label">Days Present</span>
                 </div>
                 <div className="stat-card">
                   <div className="stat-dot absent" />
                   <span className="stat-number absent">{summary.absent}</span>
-                  <span className="stat-label">Days of Absent</span>
+                  <span className="stat-label">Days Absent</span>
                 </div>
                 <div className="stat-card">
                   <div className="stat-dot late" />
                   <span className="stat-number late">{summary.late}</span>
-                  <span className="stat-label">Days of Late</span>
+                  <span className="stat-label">Days Late</span>
                 </div>
               </div>
 
@@ -592,7 +706,8 @@ const Dashboard = () => {
                           <td>{formatTime(r.clock_in)}</td>
                           <td>{formatTime(r.clock_out)}</td>
                           <td>{calcHours(r.clock_in, r.clock_out)}</td>
-                          <td style={{ color: r.overtime_minutes > 0 ? "#7c3aed" : "#9ca3af" }}>
+                          {/* FIX: CSS class replaces inline style */}
+                          <td className={r.overtime_minutes > 0 ? "overtime-active" : "overtime-none"}>
                             {formatOvertime(r.overtime_minutes) || "--"}
                           </td>
                           <td>{getStatusBadge(r.status)}</td>
@@ -605,7 +720,7 @@ const Dashboard = () => {
             </>
           )}
 
-         
+          {/* RECORDS TAB */}
           {activeNav === "records" && (
             <>
               <div className="records-header">
@@ -656,7 +771,7 @@ const Dashboard = () => {
                           <td>{formatTime(r.clock_in)}</td>
                           <td>{formatTime(r.clock_out)}</td>
                           <td>{calcHours(r.clock_in, r.clock_out)}</td>
-                          <td style={{ color: r.overtime_minutes > 0 ? "#7c3aed" : "#9ca3af" }}>
+                          <td className={r.overtime_minutes > 0 ? "overtime-active" : "overtime-none"}>
                             {formatOvertime(r.overtime_minutes) || "--"}
                           </td>
                           <td>{getStatusBadge(r.status)}</td>
@@ -669,10 +784,8 @@ const Dashboard = () => {
             </>
           )}
 
-        
-          {activeNav === "leave" && (
-            <EmployeeLeaveSection />
-          )}
+          {/* LEAVE TAB */}
+          {activeNav === "leave" && <EmployeeLeaveSection />}
 
         </div>
       </div>

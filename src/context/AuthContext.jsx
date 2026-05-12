@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/immutability */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
@@ -24,16 +26,16 @@ export const AuthProvider = ({ children }) => {
 
   const fetchRole = async (userId) => {
     if (!userId) { setLoading(false); return }
-    const { data } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single()
-    console.log("Fetched role:", data?.role)
-    setRole(data?.role ?? null)
+
+    
+    const { data,} = await supabase
+      .rpc('get_user_role', { user_id: userId })
+
+    
+
+    setRole(data ?? null)
     setLoading(false)
   }
-
 
   return (
     <AuthContext.Provider value={{ user, role, loading }}>

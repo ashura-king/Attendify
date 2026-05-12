@@ -6,7 +6,7 @@ import { faEye, faEyeSlash } from '@fortawesome/free-regular-svg-icons'
 import { supabase } from '../../lib/supabaseClient'
 
 function Login() {
-  const [username, setUsername] = useState('')  
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -16,22 +16,19 @@ function Login() {
     e.preventDefault()
     setLoading(true)
 
-   
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('full_name', username)
-      .single()
+    // ✅ Fix 1: Use RPC function to bypass RLS
+    const { data: email, error: rpcError } = await supabase
+      .rpc('get_email_by_username', { username })
 
-    if (profileError || !profile) {
+    if (rpcError || !email) {
       alert('Username not found!')
       setLoading(false)
       return
     }
 
-   
+    // ✅ Fix 2: Login with found email
     const { error } = await supabase.auth.signInWithPassword({
-      email: profile.email,
+      email,
       password,
     })
 
@@ -41,11 +38,19 @@ function Login() {
       return
     }
 
-    if(profile.role === 'admin'){
+    // ✅ Fix 3: Fetch role AFTER login (now authenticated, RLS allows it)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('email', email)
+      .single()
+
+    if (profile?.role === 'admin') {
       navigate('/admin')
-    }else{
+    } else {
       navigate('/dashboard')
     }
+
     setLoading(false)
   }
 

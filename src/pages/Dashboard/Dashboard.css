@@ -635,6 +635,40 @@ body.dark {
   font-size: 12px;
   font-weight: 600;
 }
+/* Mark Absent button */
+.btn-absent {
+  background-color: #e53e3e;
+  color: #fff;
+  border: none;
+  padding: 10px 28px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 12px;
+}
+.btn-absent:hover { background-color: #c53030; }
+
+/* Password eye toggle wrapper */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 38px;
+}
+.eye-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  font-size: 1rem;
+  padding: 0;
+}
+.eye-toggle:hover { color: #333; }
 
 /* ── DARK MODE ── */
 .app-layout.dark                    { background: #0f172a; }
@@ -710,6 +744,16 @@ body.dark {
   transition: all 0.3s;
   transform-origin: center;
 }
+.marked-absent {
+  margin-top: 14px;
+  font-weight: 600;
+  color: #e53e3e;
+  font-size: 0.95rem;
+  background: rgba(229, 62, 62, 0.08);
+  border: 1px solid rgba(229, 62, 62, 0.25);
+  border-radius: 8px;
+  padding: 10px 16px;
+}
 
 .ham-line.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .ham-line.open:nth-child(2) { opacity: 0; }
@@ -748,7 +792,7 @@ body.dark {
 .nav-logout       { color: #f87171 !important; }
 .nav-logout:hover { background: rgba(248,113,113,0.1) !important; }
 
-/* ── RESPONSIVE ── */
+
 
 /* Tablet */
 @media (max-width: 1024px) {
@@ -803,7 +847,7 @@ body.dark {
   .btn-timein,
   .btn-timeout { width: 100%; max-width: 240px; }
 
-  /* FIX: on mobile, notif dropdown can extend left to avoid going off-screen */
+  
   .notif-dropdown {
     width: 290px;
     right: -8px;

@@ -7,8 +7,9 @@ import { useAuth } from "../../context/AuthContext";
 import EmployeeLeaveSection from "./EmployeeLeave";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell } from "@fortawesome/free-regular-svg-icons";
+import { faEye, faEyeSlash } from "@fortawesome/free-regular-svg-icons";
 
-// ── Named constants ─────────────────────────────────────────────────────────
+
 const SHIFT_HOURS     = 8;
 const HISTORY_LIMIT   = 10;
 const MIN_PASSWORD_LEN = 6;
@@ -17,7 +18,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [currentTime, setCurrentTime]               = useState(new Date()); // FIX: consistent camelCase
+  const [currentTime, setCurrentTime]               = useState(new Date()); 
   const [todayRecord, setTodayRecord]               = useState(null);
   const [history, setHistory]                       = useState([]);
   const [summary, setSummary]                       = useState({ present: 0, absent: 0, late: 0 });
@@ -41,6 +42,8 @@ const Dashboard = () => {
   const [monthlyRecords, setMonthlyRecords]         = useState([]);
   const [notifications, setNotifications]           = useState([]);
   const [showNotif, setShowNotif]                   = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -48,9 +51,7 @@ const Dashboard = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  // ── Shared helpers ──────────────────────────────────────────────────────────
-
-  // FIX: extracted into one reusable function — was duplicated twice in handleClockIn
+ 
   const fetchShiftSettings = useCallback(async () => {
     const { data } = await supabase
       .from("shift_settings")
@@ -93,7 +94,7 @@ const Dashboard = () => {
       .eq("user_id", user.id)
       .eq("date", today)
       .single();
-    // FIX: PGRST116 = "no rows found" — not a real error, suppress it
+   
     if (error && error.code !== "PGRST116") {
       console.error("fetchTodayRecord:", error.message);
     }
@@ -111,8 +112,7 @@ const Dashboard = () => {
     if (data) setHistory(data);
   }, [user]);
 
-  // FIX: summary now queries the full current month, not just the last 10 rows
-  // This means the stat cards on the Dashboard tab show accurate numbers
+  
   const fetchMonthlySummary = useCallback(async () => {
     const now     = new Date();
     const year    = now.getFullYear();
@@ -162,8 +162,7 @@ const Dashboard = () => {
     setNotifications(data || []);
   }, [user]);
 
-  // ── Effects ─────────────────────────────────────────────────────────────────
-
+ 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -175,7 +174,7 @@ const Dashboard = () => {
       await fetchProfile();
       await fetchTodayRecord();
       await fetchHistory();
-      await fetchMonthlySummary(); // FIX: replaces fetchHistory-derived summary
+      await fetchMonthlySummary(); 
       await fetchNotifications();
     })();
   }, [user]);
@@ -208,14 +207,13 @@ const Dashboard = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen, showNotif]);
 
-  // FIX: auto-clear the inline clock-in message after 3s
+
   useEffect(() => {
     if (!clockInMsg) return;
     const t = setTimeout(() => setClockInMsg(""), 3000);
     return () => clearTimeout(t);
   }, [clockInMsg]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleClockIn = async () => {
     setLoading(true);
@@ -231,7 +229,7 @@ const Dashboard = () => {
       .eq("date", today)
       .single();
 
-    // FIX: shift settings fetched once, shared across both branches
+   
     const shiftData = await fetchShiftSettings();
 
     if (existingRecord) {
@@ -242,7 +240,7 @@ const Dashboard = () => {
           .update({ clock_in: timeStr, status })
           .eq("id", existingRecord.id);
       } else {
-        // FIX: replaced blocking alert() with inline state message
+       
         setClockInMsg("You have already clocked in today.");
         setLoading(false);
         return;
@@ -319,7 +317,7 @@ const Dashboard = () => {
           .upload(fileName, avatar, { upsert: true });
         if (!uploadError) {
           const { data: urlData } = supabase.storage.from("Avatar").getPublicUrl(fileName);
-          // FIX: cache-buster so browser doesn't serve the old avatar after upsert
+ 
           avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
         }
       }
@@ -363,7 +361,6 @@ const Dashboard = () => {
     setProfileLoading(false);
   };
 
-  // ── Pure helpers ─────────────────────────────────────────────────────────────
 
   const formatTime = (timeStr) => {
     if (!timeStr) return "--:--";
@@ -448,12 +445,45 @@ const Dashboard = () => {
               <p className="modal-section-label">Change Password</p>
               <div className="modal-field">
                 <label>New Password</label>
-                <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Leave blank to keep current" />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="Leave blank to keep current"
+                  />
+                  <button
+                    type="button"
+                    className="eye-toggle"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    tabIndex={-1}
+                  >
+                    <FontAwesomeIcon icon={showNewPassword ? faEyeSlash : faEye} />
+                  </button>
+                </div>
               </div>
+ 
+              {/* ── FIX: Confirm Password with eye toggle ── */}
               <div className="modal-field">
                 <label>Confirm New Password</label>
-                <input type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Confirm new password" />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                  />
+                  <button
+                    type="button"
+                    className="eye-toggle"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    tabIndex={-1}
+                  >
+                    <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
+                  </button>
+                </div>
               </div>
+
               {profileMsg.text && (
                 <p className={`modal-msg ${profileMsg.type}`}>
                   {profileMsg.type === "success" ? "✓" : "✕"} {profileMsg.text}

@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabaseClient'
 import useBlockBack from "../../hooks/useBlockBack";
 
 function Login() {
-    useBlockBack();
+  useBlockBack();
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

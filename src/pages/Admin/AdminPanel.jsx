@@ -824,7 +824,7 @@ const AdminPanel = () => {
                     disabled={attendance.length === 0}
                     title="Download current records as CSV"
                   >
-                    ⬇ Export CSV
+                    ⬇ Export Report
                   </button>
                 </div>
               </div>

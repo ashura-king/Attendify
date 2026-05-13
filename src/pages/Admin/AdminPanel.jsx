@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
 import trashGif from "../../assets/icons/trash.gif";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {faBell} from '@fortawesome/free-regular-svg-icons';
+import { faBell } from "@fortawesome/free-regular-svg-icons";
 
 const AdminPanel = () => {
   const { user } = useAuth();
@@ -48,11 +48,11 @@ const AdminPanel = () => {
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
 
-  
   const [notifications, setNotifications] = useState([]);
   const [showNotif, setShowNotif] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // ─── Fetch Functions ───────────────────────────────────────────────────────
 
   const fetchAdminProfile = useCallback(async () => {
     const { data } = await supabase
@@ -128,49 +128,39 @@ const AdminPanel = () => {
       .order("full_name");
     if (data) setEmployees(data);
   }, []);
- 
+
   const fetchNotifications = useCallback(async () => {
-  const { data, error } = await supabase
-    .from("leave_requests")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("leave_requests")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.log("notif error:", error);
-    return;
-  }
+    if (error) { console.log("notif error:", error); return; }
 
-  if (!data || data.length === 0) {
-    setNotifications([]);
-    setUnreadCount(0);
-    return;
-  }
+    if (!data || data.length === 0) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
 
- 
-  const userIds = [...new Set(data.map((r) => r.user_id))];
+    const userIds = [...new Set(data.map((r) => r.user_id))];
+    const { data: profilesData, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", userIds);
 
-  
-  const { data: profilesData, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, full_name, avatar_url")
-    .in("id", userIds);
+    if (profileError) console.log("profile error:", profileError);
 
-  if (profileError) {
-    console.log("profile error:", profileError);
-  }
+    const merged = data.map((r) => ({
+      ...r,
+      profiles: profilesData?.find((p) => p.id === r.user_id) || null,
+    }));
 
-  
-  const merged = data.map((r) => ({
-    ...r,
-    profiles: profilesData?.find((p) => p.id === r.user_id) || null,
-  }));
+    setNotifications(merged);
+    setUnreadCount(merged.length);
+  }, []);
 
-  console.log("notif data:", merged);
-
-  setNotifications(merged);
-  setUnreadCount(merged.length);
-}, []);
   const fetchLeaveRequests = useCallback(async () => {
     const { data, error } = await supabase
       .from("leave_requests")
@@ -240,6 +230,7 @@ const AdminPanel = () => {
     await supabase.from("attendance").insert(absentRows);
   }, []);
 
+  // ─── Effects ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!user) return;
@@ -259,6 +250,25 @@ const AdminPanel = () => {
     (async () => { await fetchAttendance(); })();
   }, [filterDate, filterName]);
 
+  // ─── Real-time listener for leave_requests ─────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("leave-requests-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "leave_requests" },
+        () => {
+          fetchNotifications();
+          fetchLeaveRequests();
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [user]);
+
   useEffect(() => { document.body.classList.toggle("dark", darkMode); }, [darkMode]);
 
   useEffect(() => {
@@ -267,7 +277,6 @@ const AdminPanel = () => {
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, [menuOpen]);
 
- 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -284,6 +293,7 @@ const AdminPanel = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen, showNotif]);
 
+  // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/login"); };
 
@@ -353,116 +363,68 @@ const AdminPanel = () => {
   };
 
   const handleLeaveDecision = async () => {
-  const { error } = await supabase
-    .from("leave_requests")
-    .update({
-      status: leaveAction,
-      admin_note: adminNote,
-    })
-    .eq("id", selectedLeave.id);
+    const { error } = await supabase
+      .from("leave_requests")
+      .update({ status: leaveAction, admin_note: adminNote })
+      .eq("id", selectedLeave.id);
 
-  if (error) {
-    alert("Error: " + error.message);
-    return;
-  }
+    if (error) { alert("Error: " + error.message); return; }
 
-  
-  await supabase.from("notifications").insert({
-    user_id: selectedLeave.user_id,
-    title:
-      leaveAction === "approved"
-        ? "Leave Approved"
-        : "Leave Rejected",
+    await supabase.from("notifications").insert({
+      user_id: selectedLeave.user_id,
+      title: leaveAction === "approved" ? "Leave Approved" : "Leave Rejected",
+      message:
+        leaveAction === "approved"
+          ? `Your ${selectedLeave.leave_type} leave request was approved.`
+          : `Your ${selectedLeave.leave_type} leave request was rejected.`,
+      type: "leave",
+    });
 
-    message:
-      leaveAction === "approved"
-        ? `Your ${selectedLeave.leave_type} leave request was approved.`
-        : `Your ${selectedLeave.leave_type} leave request was rejected.`,
-
-    type: "leave",
-  });
-
-  setShowLeaveNoteModal(false);
-
-  await fetchLeaveRequests();
-};
-  const filteredLeaves = leaveFilter === "all"
-    ? leaveRequests
-    : leaveRequests.filter((l) => l.status === leaveFilter);
-
-  const downloadCSV = () => {
-    if (attendance.length === 0) return;
-
-    const headers = ["Employee", "Department", "Date", "Time In", "Time Out", "Overtime", "Status"];
-
-    const rows = attendance.map((r) => [
-      r.profiles?.full_name || "Unknown",
-      r.profiles?.department || "--",
-      formatDate(r.date),
-      formatTime(r.clock_in),
-      formatTime(r.clock_out),
-      formatOvertime(r.overtime_minutes) || "--",
-      r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "--",
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const label = filterDate ? `_${filterDate}` : `_${new Date().toISOString().split("T")[0]}`;
-    link.download = `attendance${label}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    setShowLeaveNoteModal(false);
+    await fetchLeaveRequests();
+    await fetchNotifications(); // ← refresh bell count after decision
   };
 
   const handleSaveShift = async () => {
-  setShiftSaving(true);
+    setShiftSaving(true);
 
-  const { error } = await supabase
-    .from("shift_settings")
-    .update({
-      start_time: shift.start_time,
-      end_time: shift.end_time,
-      grace_period: Number(shift.grace_period),
-    })
-    .eq("id", 1);
+    const { error } = await supabase
+      .from("shift_settings")
+      .update({
+        start_time: shift.start_time,
+        end_time: shift.end_time,
+        grace_period: Number(shift.grace_period),
+      })
+      .eq("id", 1);
 
-  setShiftSaving(false);
+    setShiftSaving(false);
 
-  if (error) {
-    alert("Error saving shift: " + error.message);
-    return;
-  }
+    if (error) { alert("Error saving shift: " + error.message); return; }
 
- 
-  const { data: employees } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("role", "employee");
+    const { data: empList } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "employee");
 
-  if (employees && employees.length > 0) {
-    const notifRows = employees.map((emp) => ({
-      user_id: emp.id,
-      title: "Shift Schedule Updated",
-      message: `Admin updated the work shift to ${formatTime(
-        shift.start_time
-      )} - ${formatTime(shift.end_time)}.`,
-      type: "shift",
-    }));
+    if (empList && empList.length > 0) {
+      const notifRows = empList.map((emp) => ({
+        user_id: emp.id,
+        title: "Shift Schedule Updated",
+        message: `Admin updated the work shift to ${formatTime(shift.start_time)} - ${formatTime(shift.end_time)}.`,
+        type: "shift",
+      }));
+      await supabase.from("notifications").insert(notifRows);
+    }
 
-    await supabase.from("notifications").insert(notifRows);
-  }
+    setShiftSaved(true);
+    setTimeout(() => setShiftSaved(false), 2500);
+  };
 
-  setShiftSaved(true);
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
-  setTimeout(() => {
-    setShiftSaved(false);
-  }, 2500);
-};
+  const filteredLeaves = leaveFilter === "all"
+    ? leaveRequests
+    : leaveRequests.filter((l) => l.status === leaveFilter);
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -516,7 +478,34 @@ const AdminPanel = () => {
     );
   };
 
+  const downloadCSV = () => {
+    if (attendance.length === 0) return;
+    const headers = ["Employee", "Department", "Date", "Time In", "Time Out", "Overtime", "Status"];
+    const rows = attendance.map((r) => [
+      r.profiles?.full_name || "Unknown",
+      r.profiles?.department || "--",
+      formatDate(r.date),
+      formatTime(r.clock_in),
+      formatTime(r.clock_out),
+      formatOvertime(r.overtime_minutes) || "--",
+      r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "--",
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const label = filterDate ? `_${filterDate}` : `_${new Date().toISOString().split("T")[0]}`;
+    link.download = `attendance${label}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const navItems = ["attendance", "employee", "leave", "shift"];
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className={`admin-layout ${darkMode ? "dark" : ""}`}>
@@ -717,17 +706,16 @@ const AdminPanel = () => {
           </button>
           <h1>Attendance Dashboard</h1>
 
-          
           <div className="admin-topbar-actions">
 
-            
+            {/* Notification Bell */}
             <div className="notif-wrapper">
-            <button className="notif-btn" onClick={() => setShowNotif(!showNotif)}>
-               <FontAwesomeIcon icon={faBell} />
+              <button className="notif-btn" onClick={() => setShowNotif(!showNotif)}>
+                <FontAwesomeIcon icon={faBell} />
                 {unreadCount > 0 && (
-                <span className="notif-badge">{unreadCount}</span>
-                  )}
-                </button>
+                  <span className="notif-badge">{unreadCount}</span>
+                )}
+              </button>
               {showNotif && (
                 <div className="notif-dropdown">
                   <div className="notif-header">
@@ -879,7 +867,7 @@ const AdminPanel = () => {
             </div>
           )}
 
-      
+          {/* Employee Tab */}
           {activeNav === "employee" && (
             <div className="admin-table-section">
               <div className="admin-table-header"><h2>Employees</h2></div>
@@ -991,6 +979,7 @@ const AdminPanel = () => {
             </div>
           )}
 
+          {/* Shift Tab */}
           {activeNav === "shift" && (
             <div className="shift-wrapper">
               <div className="shift-title"><h2>Global Shift Settings</h2></div>

@@ -4,8 +4,10 @@ import './Login.css'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEye, faEyeSlash } from '@fortawesome/free-regular-svg-icons'
 import { supabase } from '../../lib/supabaseClient'
+import useBlockBack from "../../hooks/useBlockBack";
 
 function Login() {
+    useBlockBack();
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

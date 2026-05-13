@@ -8,13 +8,14 @@ import EmployeeLeaveSection from "./EmployeeLeave";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell } from "@fortawesome/free-regular-svg-icons";
 import { faEye, faEyeSlash } from "@fortawesome/free-regular-svg-icons";
-
+import useBlockBack from "../../hooks/useBlockBack";
 
 const SHIFT_HOURS     = 8;
 const HISTORY_LIMIT   = 10;
 const MIN_PASSWORD_LEN = 6;
 
 const Dashboard = () => {
+  useBlockBack();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -27,7 +28,7 @@ const Dashboard = () => {
   const [profile, setProfile]                       = useState(null);
   const [darkMode, setDarkMode]                     = useState(false);
   const [menuOpen, setMenuOpen]                     = useState(false);
-  const [clockInMsg, setClockInMsg]                 = useState(""); // FIX: replaces native alert()
+  const [clockInMsg, setClockInMsg]                 = useState(""); 
 
   const [showProfile, setShowProfile]               = useState(false);
   const [editName, setEditName]                     = useState("");
@@ -262,7 +263,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   };
 
   const handleClockOut = async () => {
-    // FIX: null guard — prevents crash if todayRecord has no clock_in (race condition)
+    
     if (!todayRecord?.clock_in) {
       console.error("handleClockOut: todayRecord or clock_in is missing");
       return;
@@ -274,7 +275,6 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [inH, inM]   = todayRecord.clock_in.split(":").map(Number);
     const [outH, outM] = timeStr.split(":").map(Number);
     const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    // FIX: uses named constant instead of magic number 8
     const overtimeMinutes = Math.max(0, totalMinutes - SHIFT_HOURS * 60);
 
     const { error } = await supabase
@@ -339,7 +339,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
           setProfileLoading(false);
           return;
         }
-        // FIX: uses named constant instead of magic number 6
+ 
         if (editPassword.length < MIN_PASSWORD_LEN) {
           setProfileMsg({ type: "error", text: `Password must be at least ${MIN_PASSWORD_LEN} characters!` });
           setProfileLoading(false);
@@ -407,8 +407,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     absent:  monthlyRecords.filter((r) => r.status === "absent").length,
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
+ 
   return (
     <div className={`app-layout ${darkMode ? "dark" : ""}`}>
 

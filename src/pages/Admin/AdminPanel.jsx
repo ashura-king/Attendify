@@ -7,8 +7,10 @@ import { useAuth } from "../../context/AuthContext";
 import trashGif from "../../assets/icons/trash.gif";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBell } from "@fortawesome/free-regular-svg-icons";
+import useBlockBack from "../../hooks/useBlockBack";
 
 const AdminPanel = () => {
+  useBlockBack();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -52,7 +54,7 @@ const AdminPanel = () => {
   const [showNotif, setShowNotif] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ─── Fetch Functions ───────────────────────────────────────────────────────
+  
 
   const fetchAdminProfile = useCallback(async () => {
     const { data } = await supabase
@@ -230,8 +232,7 @@ const AdminPanel = () => {
     await supabase.from("attendance").insert(absentRows);
   }, []);
 
-  // ─── Effects ───────────────────────────────────────────────────────────────
-
+  
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -250,7 +251,7 @@ const AdminPanel = () => {
     (async () => { await fetchAttendance(); })();
   }, [filterDate, filterName]);
 
-  // ─── Real-time listener for leave_requests ─────────────────────────────────
+  
   useEffect(() => {
     if (!user) return;
 
@@ -293,7 +294,7 @@ const AdminPanel = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen, showNotif]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
+  
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate("/login"); };
 
@@ -382,7 +383,7 @@ const AdminPanel = () => {
 
     setShowLeaveNoteModal(false);
     await fetchLeaveRequests();
-    await fetchNotifications(); // ← refresh bell count after decision
+    await fetchNotifications(); 
   };
 
   const handleSaveShift = async () => {
@@ -420,7 +421,7 @@ const AdminPanel = () => {
     setTimeout(() => setShiftSaved(false), 2500);
   };
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  
 
   const filteredLeaves = leaveFilter === "all"
     ? leaveRequests
@@ -505,7 +506,7 @@ const AdminPanel = () => {
 
   const navItems = ["attendance", "employee", "leave", "shift"];
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  
 
   return (
     <div className={`admin-layout ${darkMode ? "dark" : ""}`}>

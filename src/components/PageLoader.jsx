@@ -1,4 +1,4 @@
-import attendifyLogo from "../../assets/images/attendify.png";
+import attendifyLogo from "../assets/images/attendify.png";
 
 const PageLoader = () => {
   return (

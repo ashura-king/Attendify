@@ -676,7 +676,10 @@ const AdminPanel = () => {
             <div
               key={nav}
               className={`admin-nav-item ${activeNav === nav ? "active" : ""}`}
-              onClick={() => setActiveNav(nav)}
+              onClick={() => {
+                setActiveNav(nav);
+                if (nav === "leave") setUnreadCount(0);
+              }}
             >
               {nav.charAt(0).toUpperCase() + nav.slice(1)}
             </div>
@@ -729,7 +732,7 @@ const AdminPanel = () => {
                       <div
                         key={n.id}
                         className="notif-item"
-                        onClick={() => { setActiveNav("leave"); setShowNotif(false); }}
+                        onClick={() => { setActiveNav("leave"); setShowNotif(false); setUnreadCount(0); }}
                       >
                         <div className="notif-avatar">
                           {n.profiles?.full_name?.charAt(0).toUpperCase() || "U"}
@@ -746,7 +749,7 @@ const AdminPanel = () => {
                   )}
                   <div
                     className="notif-footer"
-                    onClick={() => { setActiveNav("leave"); setShowNotif(false); }}
+                    onClick={() => { setActiveNav("leave"); setShowNotif(false); setUnreadCount(0); }}
                   >
                     View all leave requests →
                   </div>
@@ -771,7 +774,11 @@ const AdminPanel = () => {
             <div
               key={nav}
               className={`admin-nav-item ${activeNav === nav ? "active" : ""}`}
-              onClick={() => { setActiveNav(nav); setMenuOpen(false); }}
+              onClick={() => {
+                setActiveNav(nav);
+                setMenuOpen(false);
+                if (nav === "leave") setUnreadCount(0);
+              }}
             >
               {nav.charAt(0).toUpperCase() + nav.slice(1)}
             </div>

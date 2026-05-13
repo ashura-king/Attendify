@@ -16,7 +16,7 @@ function Login() {
     e.preventDefault()
     setLoading(true)
 
-    // ✅ Fix 1: Use RPC function to bypass RLS
+    
     const { data: email, error: rpcError } = await supabase
       .rpc('get_email_by_username', { username })
 
@@ -26,7 +26,7 @@ function Login() {
       return
     }
 
-    // ✅ Fix 2: Login with found email
+ 
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -38,7 +38,7 @@ function Login() {
       return
     }
 
-    // ✅ Fix 3: Fetch role AFTER login (now authenticated, RLS allows it)
+    
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
